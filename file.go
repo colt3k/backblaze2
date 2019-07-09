@@ -1,0 +1,995 @@
+package backblaze2
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"math"
+	"net/url"
+	"os"
+	"path"
+	"strconv"
+	"strings"
+	"sync"
+
+	"github.com/colt3k/nglog/ers/bserr"
+	log "github.com/colt3k/nglog/ng"
+	"github.com/colt3k/utils/concur"
+	"github.com/colt3k/utils/encode"
+	"github.com/colt3k/utils/encode/encodeenum"
+	"github.com/colt3k/utils/file"
+	"github.com/colt3k/utils/file/filemeta"
+	"github.com/colt3k/utils/file/filenative"
+	"github.com/colt3k/utils/file/filesize"
+	"github.com/colt3k/utils/hash/hashenum"
+	"github.com/colt3k/utils/hash/sha1"
+	"github.com/colt3k/utils/io/ioreader/passthrough"
+	"github.com/colt3k/utils/io/iowriter"
+	"github.com/colt3k/utils/mathut"
+
+	"github.com/colt3k/backblaze2/b2api"
+	"github.com/colt3k/backblaze2/errs"
+	"github.com/colt3k/backblaze2/internal/auth"
+	"github.com/colt3k/backblaze2/internal/caller"
+	"github.com/colt3k/backblaze2/internal/env"
+	"github.com/colt3k/backblaze2/internal/uri"
+	"github.com/colt3k/backblaze2/perms"
+)
+
+const fileChunk = 10 * (1 << 20)
+const fileChunkLg = 100 * (1 << 20)
+const (
+	// MinPartSize in MB
+	MinPartSize = 6
+	// MinParts count size
+	MinParts = 2
+	// MaxUploadTB size in TB
+	MaxUploadTB = 10
+	maxParts    = 10000
+)
+
+var (
+	//MaxPerSessionUploadPerPart sessions
+	MaxPerSessionUploadPerPart = 3
+	fcLg                       bool
+)
+
+func post(url string, req interface{}, header map[string]string) (map[string]interface{}, errs.Error) {
+	msg, errUn := caller.UnMarshalRequest(req)
+	if errUn != nil {
+		return nil, errs.New(errUn, "")
+	}
+	log.Logln(log.DEBUG, "Request:", string(msg))
+
+	mapData, er := caller.MakeCall("POST", url, bytes.NewReader(msg), header)
+	if er != nil {
+		return nil, er
+	}
+	log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+	return mapData, nil
+}
+
+// SendParts send parts to target
+func SendParts(b2Auth b2api.AuthConfig, up *Upload) bool {
+
+	// This controls the Upload of PARTS using UploadPart
+	authd, err := auth.AuthorizeAccount(b2Auth)
+	if err != nil {
+		log.Logf(log.ERROR, "%+v", err)
+		return false
+	}
+
+	if perms.StartLargeFile(authd) {
+
+		// Get parts we created earlier
+		parts := up.RetrieveToUpload()
+
+		//Create Worker Pool to upload ***************************************
+
+		var tasks []*concur.Task
+		fo, err := os.Open(up.File.Path())
+		bserr.StopErr(err, "err opening file")
+
+		defer fo.Close()
+		for _, d := range parts {
+			d := d
+			//Create a buffer of the partial size to load with data
+			partBuffer := make([]byte, d.Size)
+			//Read data into byte array
+			fo.ReadAt(partBuffer, d.Start)
+
+			//Create Task, send to worker
+			task := concur.NewTask(
+				func() (error, []byte) {
+					et := worker(b2Auth, up, d, partBuffer)
+					return nil, []byte(et)
+				},
+				NewRtnd(up))
+
+			tasks = append(tasks, task)
+		}
+		p := concur.NewPool(tasks, MaxPerSessionUploadPerPart)
+		p.Run()
+
+		// END WORKER POOL ****************************************************
+
+		if up.Completed() {
+			//Completed Finish off
+			shas := make([]string, 0)
+			for _, d := range parts {
+				shas = append(shas, d.Etag)
+			}
+			_, err := FinishLargeFileUpload(b2Auth, up.FileID, shas)
+			if err != nil {
+				return false
+			}
+			return true
+		}
+		return false
+	}
+	return false
+}
+
+func worker(b2Auth b2api.AuthConfig, up *Upload, p *UploaderPart, data []byte) string {
+
+	fupr, err := GetUploadPartURL(b2Auth, up.FileID)
+	if err != nil {
+		return err.Error()
+	}
+	meta := filemeta.New(up.File)
+
+	//Not sent yet, send now
+	if len(p.Etag) <= 0 {
+		//Convert to load via START/STOP instead of actual file part
+		resp, err := UploadPart(fupr, up, p, data, meta)
+		if err != nil {
+			log.Logf(log.ERROR, "%+v", err)
+			return ""
+		}
+		log.Logln(log.DEBUG, p.PartID, " Uploaded: ", resp)
+		// return string of etag+^+partid
+		etID := resp.ContentSha1 + "^" + strconv.FormatUint(p.PartID, 10)
+		return etID
+	}
+	// return ^+partid
+	return "^" + strconv.FormatUint(p.PartID, 10)
+}
+
+func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPart, data []byte, meta file.Meta) (*b2api.UploadPartResponse, error) {
+
+	partID := int(p.PartID)
+	size := int64(p.Size)
+	header := auth.BuildAuthMap(fupr.AuthorizationToken)
+
+	header["X-Bz-File-Name"] = up.File.Name()
+	header["X-Bz-Part-Number"] = strconv.Itoa(partID)
+	header["Content-Length"] = mathut.FmtInt(int(size))
+
+	sha1hash := encode.Encode(sha1.NewHash(sha1.Format(hashenum.SHA1)).String(string(data)), encodeenum.Hex)
+	header["X-Bz-Content-Sha1"] = sha1hash
+	header["X-Bz-Info-src_last_modified_millis"] = mathut.FmtInt(int(meta.LastMod()))
+
+	r := ioutil.NopCloser(bytes.NewReader(data))
+	log.Logln(log.DEBUG, "Uploading: ", partID, " Size: ", size)
+	rc := passthrough.NewStream(r, size, up.File.Name(), int(partID), 5)
+
+	mapData, err := caller.MakeCall("POST", fupr.UploadURL, rc, header)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+
+	var b2Response *b2api.UploadPartResponse
+	errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
+	if errUn != nil {
+		return nil, errs.New(errUn, "")
+	}
+
+	return b2Response, nil
+}
+
+// NewUploaderPart create uploader part
+func NewUploaderPart(part uint64, start, end, size int64) *UploaderPart {
+	t := new(UploaderPart)
+	t.PartID = part
+	t.Size = size
+	t.Start = start
+	t.End = end
+
+	return t
+}
+
+// UploadURL retrieve upload url
+func UploadURL(b2Auth *b2api.AuthorizationResp, bucketId string) (*b2api.UploadURLResp, errs.Error) {
+
+	if perms.GetUploadURL(b2Auth) {
+
+		header := auth.BuildAuthMap(b2Auth.AuthorizationToken)
+		req := b2api.UploadURLReq{
+			BucketId: bucketId,
+		}
+
+		data, er := post(b2Auth.APIURL+uri.B2GetUploadURL, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.UploadURLResp
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// UploadFile file name and info must fit in 7k byte limit,
+// 	the file to be uploaded is the message body and is not encoded in any way.
+//		it's not URL encoded, it's not MIME encoded
+func UploadFile(authConfig b2api.AuthConfig, bucketId, filePath string) (*b2api.UploadResp, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.UploadFile(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+		upURL, er := UploadURL(authd, bucketId)
+		if err != nil {
+			return nil, err
+		}
+
+		// Process File
+		//	- Retrieve File Name
+		//	- Retrieve file size
+		//	- Retrieve SHA-1
+		//	- Retrieve Last Modified in millis
+		f := filenative.NewFile(filePath)
+		name := url.URL{Path: f.Name()}
+
+		meta := filemeta.New(f)
+		// create sha1 hash and encode it
+		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
+
+		header = auth.BuildAuthMap(upURL.AuthorizationToken)
+		header["X-Bz-File-Name"] = name.String() // name of the file, in percent-encoded UTF-8
+		header["Content-Type"] = "b2/x-auto"     // MIME type, b2/x-auto to automatically set the stored Content-Type post upload
+		// https://www.backblaze.com/b2/docs/content-types.html
+		header["Content-Length"] = mathut.FmtInt(int(f.Size())) // number of bytes in the file being uploaded +40 for SHA1
+		// When sending the SHA1 checksum at the end, the Content-Length should be set to the size of the file plus the 40 bytes of hex checksum.
+		header["X-Bz-Content-Sha1"] = sha1hash                                            // SHA1 checksum of the content of the file. B2 will check this when the file is uploaded, to make sure that the file arrived correctly
+		header["X-Bz-Info-src_last_modified_millis"] = mathut.FmtInt(int(meta.LastMod())) // SHA1 checksum of the content of the file. B2 will check this when the file is uploaded, to make sure that the file arrived correctly
+		//header["X-Bz-Info-b2-content-disposition"] = ""   // value must match the grammar specified in RFC 6266
+		//header["X-Bz-Info-*"] = ""	// up to 10 of these replacing * with the value must be a percent encoded UTF8 string
+
+		// File is passed as []byte or ReadCloser
+		fle, errOp := os.Open(f.Path())
+		if errOp != nil {
+			return nil, errs.New(errOp, "")
+		}
+		data, errOp := ioutil.ReadAll(fle)
+		if errOp != nil {
+			return nil, errs.New(errOp, "")
+		}
+		fle.Close()
+
+		rdr := bytes.NewReader(data)
+		r := ioutil.NopCloser(rdr)
+		log.Logln(log.DEBUG, "Uploading  Size: ", f.Size())
+		rc := passthrough.NewStream(r, f.Size(), f.Name(), 1, 1)
+
+		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
+		if er != nil {
+			return nil, er
+		}
+		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		var b2Response b2api.UploadResp
+		errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "unmarshall body")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+func UploadVirtualFile(authConfig b2api.AuthConfig, bucketId, fname string, data []byte, lastMod int64) (*b2api.UploadResp, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.UploadFile(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+		upURL, er := UploadURL(authd, bucketId)
+		if err != nil {
+			return nil, err
+		}
+
+		name := url.URL{Path: fname}
+		sz := len(data)
+		// create sha1 hash and encode it
+		sha1hash := encode.Encode(sha1.NewHash(sha1.Format(hashenum.SHA1)).String(string(data)), encodeenum.Hex)
+
+		header = auth.BuildAuthMap(upURL.AuthorizationToken)
+		header["X-Bz-File-Name"] = name.String() // name of the file, in percent-encoded UTF-8
+		header["Content-Type"] = "b2/x-auto"     // MIME type, b2/x-auto to automatically set the stored Content-Type post upload
+		// https://www.backblaze.com/b2/docs/content-types.html
+		header["Content-Length"] = mathut.FmtInt(sz) // number of bytes in the file being uploaded +40 for SHA1
+		// When sending the SHA1 checksum at the end, the Content-Length should be set to the size of the file plus the 40 bytes of hex checksum.
+		header["X-Bz-Content-Sha1"] = sha1hash                                            // SHA1 checksum of the content of the file. B2 will check this when the file is uploaded, to make sure that the file arrived correctly
+		header["X-Bz-Info-src_last_modified_millis"] = mathut.FmtInt(int(lastMod)) // SHA1 checksum of the content of the file. B2 will check this when the file is uploaded, to make sure that the file arrived correctly
+		//header["X-Bz-Info-b2-content-disposition"] = ""   // value must match the grammar specified in RFC 6266
+		//header["X-Bz-Info-*"] = ""	// up to 10 of these replacing * with the value must be a percent encoded UTF8 string
+
+		rdr := bytes.NewReader(data)
+		r := ioutil.NopCloser(rdr)
+		log.Logln(log.DEBUG, "Uploading  Size: ", sz)
+		rc := passthrough.NewStream(r, int64(sz), fname, 1, 1)
+
+		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
+		if er != nil {
+			return nil, er
+		}
+		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		var b2Response b2api.UploadResp
+		errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "unmarshall body")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// ListFiles list files by name or all in bucket
+func ListFiles(authConfig b2api.AuthConfig, bucketId, filename string) (*b2api.ListFilesResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.ListFileNames(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.ListFileReq{
+			BucketID:      bucketId,
+			StartFileName: "",
+			MaxFileCount:  100,
+			Prefix:        filename,
+			Delimiter:     "",
+		}
+
+		data, er := post(authd.APIURL+uri.B2ListFileNames, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.ListFilesResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// ListFileVersions lists out all versions of file
+func ListFileVersions(authConfig b2api.AuthConfig, bucketId, fileName string) (*b2api.ListFileVersionsResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.ListFileVersions(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.ListFileVersionsReq{
+			BucketID:      bucketId,
+			StartFileName: "",
+			StartFileID:   "",
+			MaxFileCount:  100,
+			Prefix:        fileName,
+			Delimiter:     "",
+		}
+
+		data, er := post(authd.APIURL+uri.B2ListFileVersions, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.ListFileVersionsResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// DeleteFile deletes file version by file id
+func DeleteFile(authConfig b2api.AuthConfig, fileName, fileID string) (*b2api.DeleteFileVersionResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.DeleteFiles(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.DeleteFileVersionReq{
+			FileName: fileName,
+			FileID:   fileID,
+		}
+
+		data, er := post(authd.APIURL+uri.B2DeleteFileVersion, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.DeleteFileVersionResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// HideFile hides file by putting 0 content length in history
+func HideFile(authConfig b2api.AuthConfig, bucketId, fileName string) (*b2api.HideFileResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.HideFile(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.HideFileReq{
+			BucketId: bucketId,
+			FileName: fileName,
+		}
+
+		data, er := post(authd.APIURL+uri.B2HideFile, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.HideFileResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// GetFileInfo provides file information
+func GetFileInfo(authConfig b2api.AuthConfig, fileID string) (*b2api.GetFileInfoResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.GetFileInfo(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.GetFileInfoReq{
+			FileID: fileID,
+		}
+
+		data, er := post(authd.APIURL+uri.B2GetFileInfo, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.GetFileInfoResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		sha1 := strings.TrimSpace(b2Response.ContentSha1)
+		if sha1 == "none" || len(sha1) == 0 {
+			//log.Logln(log.INFO, "data: ", b2Response.FileInfo.LargeFileSha1)
+			sha1 = b2Response.FileInfo.LargeFileSha1
+			b2Response.ContentSha1 = sha1
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// GetDownloadAuth required prior to download
+func GetDownloadAuth(authConfig b2api.AuthConfig, bucketID, filenamePrefix string, validDurationInSeconds int64) (*b2api.DownloadAuthResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.GetDownloadAuth(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.DownloadAuthReq{
+			BucketId:               bucketID,
+			FilenamePrefix:         filenamePrefix,
+			ValidDurationInSeconds: validDurationInSeconds,
+			B2ContentDisposition:   "",
+		}
+
+		data, er := post(authd.APIURL+uri.B2GetDownloadAuth, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.DownloadAuthResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+/* GetDownloadAuth required prior to download
+In map:
+	body			- content of file
+	Content-Length
+	Content-Type
+	X-Bz-File-Id
+	X-Bz-File-Name
+	X-Bz-Content-Sha1
+	X-Bz-Info-author
+	X-Bz-Upload-Timestamp
+	Cache-Control : max-age (only); inherited from Bucket Info
+PLUS:
+	X-Bz-Info-* headers for any custom file info during upload
+*/
+func DownloadByName(authConfig b2api.AuthConfig, bucketName, fileName string) (map[string]interface{}, errs.Error) {
+	// Only required when bucket is private
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.DownloadFile(authd) {
+
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		url := authd.DownloadURL + "/file/" + bucketName + "/" + fileName+"?Authorization="+authd.AuthorizationToken+"&b2-content-disposition=large_file_sha1"
+		mapData, er := caller.MakeCall("GET", url, nil, header)
+		if er != nil {
+			return nil, er
+		}
+
+		return mapData, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+/* DownloadByID downloads file by id
+In map:
+	body			- content of file
+	Content-Length
+	Content-Type
+	X-Bz-File-Id
+	X-Bz-File-Name
+	X-Bz-Content-Sha1
+	X-Bz-Info-author
+	X-Bz-Upload-Timestamp
+	Cache-Control : max-age (only); inherited from Bucket Info
+PLUS:
+	X-Bz-Info-* headers for any custom file info during upload
+*/
+func DownloadByID(authConfig b2api.AuthConfig, fileID string) (map[string]interface{}, errs.Error) {
+	// Only required when bucket is private
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.DownloadFile(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		url := authd.DownloadURL + uri.B2DownloadFileById + "?fileId=" + fileID
+		mapData, er := caller.MakeCall("GET", url, nil, header)
+		if er != nil {
+			return nil, er
+		}
+
+		return mapData, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// StartLargeFile create initial start call
+func StartLargeFile(authConfig b2api.AuthConfig, bucketID, fileInfo string, f file.File) (*b2api.StartLargeFileResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.StartLargeFile(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		// build sha1 and include as file info 'large_file_sha1'
+		// create sha1 hash and encode it
+		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
+
+		fm := filemeta.New(f)
+
+		req := &b2api.StartLargeFileReq{
+			BucketId:    bucketID,
+			FileName:    f.Name(),
+			ContentType: "b2/x-auto",
+			FileInfo:    b2api.FileInfo{SrcLastModifiedMillis: mathut.FmtInt(int(fm.LastMod())), LargeFileSha1:sha1hash},
+		}
+
+		data, er := post(authd.APIURL+uri.B2StartLargeFile, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.StartLargeFileResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+func GetUploadPartURL(authConfig b2api.AuthConfig, fileID string) (*b2api.GetFileUploadPartResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.GetUploadPartURL(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.GetFileUploadPartReq{
+			FileID: fileID,
+		}
+
+		data, er := post(authd.APIURL+uri.B2GetUploadPartURL, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.GetFileUploadPartResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+func ListPartsURL(authConfig b2api.AuthConfig, fileID string, startPartNo, maxPartCount int64) (*b2api.ListPartsResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.ListParts(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.ListPartsReq{
+			FileID:          fileID,
+			StartPartNumber: startPartNo,
+			MaxPartCount:    maxPartCount,
+		}
+
+		data, er := post(authd.APIURL+uri.B2ListParts, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.ListPartsResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// ListUnfinishLargeFiles show unfinished large file uploads
+func ListUnfinishedLargeFiles(authConfig b2api.AuthConfig, bucketID string) (*b2api.ListUnfinishedLargeFilesResponse, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.ListUnfinishedLargeFiles(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.ListUnfinishedLargeFilesReq{
+			BucketId:     bucketID,
+			NamePrefix:   "",
+			StartFileId:  "",
+			MaxFileCount: 100,
+		}
+
+		data, er := post(authd.APIURL+uri.B2ListUnfinishedLargeFiles, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.ListUnfinishedLargeFilesResponse
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// FinishLargeFileUpload call complete on large upload
+func FinishLargeFileUpload(authConfig b2api.AuthConfig, fileId string, sha1Array []string) (*b2api.FinishUpLgFileResp, errs.Error) {
+
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.FinishLargeFile(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+		req := &b2api.FinishUpLgFileReq{
+			FileId: fileId,
+			Sha1Ar: sha1Array,
+		}
+		data, er := post(authd.APIURL+uri.B2FinishLargeFile, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		//Convert Message
+		var b2Response b2api.FinishUpLgFileResp
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// CancelLargeFile cancel large file upload process
+func CancelLargeFile(authConfig b2api.AuthConfig, fileId string) (*b2api.CanxUpLgFileResp, errs.Error) {
+	authd, err := auth.AuthorizeAccount(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if perms.CancelLargeFile(authd) {
+		header := auth.BuildAuthMap(authd.AuthorizationToken)
+
+		req := &b2api.CanxUpLgFileReq{
+			FileId: fileId,
+		}
+		data, er := post(authd.APIURL+uri.B2CancelLargeFile, req, header)
+		if er != nil {
+			return nil, er
+		}
+
+		var b2Response b2api.CanxUpLgFileResp
+		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
+		if errUn != nil {
+			return nil, errs.New(errUn, "")
+		}
+		return &b2Response, nil
+	}
+	return nil, errs.New(fmt.Errorf("not allowed"), "")
+}
+
+// *******************************************************
+// UploaderPart struct
+type UploaderPart struct {
+	Size   int64  `json:"size"`
+	PartID uint64 `json:"part"`
+	Start  int64  `json:"start"`
+	End    int64  `json:"end"`
+	Etag   string `json:"etag"`
+}
+
+// Upload struct
+type Upload struct {
+	AppName         string          `json:"-"`
+	Bucket          string          `json:"bucket"`
+	Filepath        string          `json:"filepath"`
+	UploadID        string          `json:"uploadid"`
+	File            file.File       `json:"-"`
+	FileID          string          `json:"fileId"`
+	Parts           []*UploaderPart `json:"parts"`
+	TotalPartsCount uint64          `json:"total_parts_count"`
+	mu              sync.Mutex
+}
+
+// New create upload object
+func New(bucketName, filepath, appName string) *Upload {
+	t := new(Upload)
+	t.Bucket = bucketName
+	t.Filepath = filepath
+	t.File = filenative.NewFile(t.Filepath)
+	t.AppName = appName
+	return t
+}
+
+// Available file exists
+func (u *Upload) Available() bool {
+	return u.File.Available()
+}
+
+// ValidateOverMinPartSize check size
+func (u *Upload) ValidateOverMinPartSize() bool {
+	log.Logln(log.DEBUG, "FileSize:", u.File.Size())
+	log.Logln(log.DEBUG, "MinPartSize ", int64(filesize.SizeTypes(filesize.Bytes).Convert(MinPartSize, filesize.Mega, true)))
+	u.TotalPartsCount = uint64(math.Ceil(float64(u.File.Size()) / float64(fileChunk)))
+	// Ensure over 6MB
+	if u.File.Size() > int64(filesize.SizeTypes(filesize.Bytes).Convert(MinPartSize, filesize.Mega, true)) && u.TotalPartsCount >= MinParts {
+		return true
+	}
+	return false
+}
+
+// ValidateSize check size
+func (u *Upload) ValidateSize() bool {
+	if u.File.Size() > int64(filesize.SizeTypes(filesize.Bytes).Convert(MaxUploadTB, filesize.Tera, true)) {
+		return false
+	}
+	return true
+}
+
+// ComputePartTotal compute total parts
+func (u *Upload) ComputePartTotal() error {
+	u.TotalPartsCount = uint64(math.Ceil(float64(u.File.Size()) / float64(fileChunk)))
+	log.Logln(log.DEBUG, "How many pieces should we create?", u.TotalPartsCount)
+	if u.TotalPartsCount > maxParts {
+		//Set to 1GB if parts would be over 100
+		fcLg = true
+		u.TotalPartsCount = uint64(math.Ceil(float64(u.File.Size()) / float64(fileChunkLg)))
+	}
+	if u.TotalPartsCount > maxParts {
+		return fmt.Errorf("part count over max allowed: %d, max: %d", u.TotalPartsCount, maxParts)
+	}
+	log.Logf(log.INFO, "Splitting into %d pieces.\n", u.TotalPartsCount)
+	return nil
+}
+
+/*
+SetupPartSizes determine part sizes
+Pass in part count
+Pass in data on each part size and status i.e. completed or not
+*/
+func (u *Upload) SetupPartSizes(fileID string) {
+	u.UploadID = fileID
+	u.FileID = fileID
+	u.Parts = make([]*UploaderPart, u.TotalPartsCount)
+
+	//Open file to read and determine start/end of each part
+	fo, err := os.Open(u.File.Path())
+	bserr.Err(err, "err opening file")
+
+	defer fo.Close()
+
+	var lastsize, start, end int64
+
+	for i := uint64(0); i < u.TotalPartsCount; i++ {
+		// file size - this chunk is the size of the part
+		partSize := int64(math.Min(fileChunk, float64(u.File.Size()-int64(i*fileChunk))))
+		if fcLg {
+			partSize = int64(math.Min(fileChunkLg, float64(u.File.Size()-int64(i*fileChunkLg))))
+		}
+
+		//first time through set to partSize
+		if lastsize == 0 {
+			lastsize = partSize
+		}
+
+		// start is equal to the loop id multiplied by lastsize
+		start = int64(i) * lastsize
+		if start == 0 {
+			end = lastsize
+		} else {
+			end = start + lastsize
+		}
+		if i == u.TotalPartsCount-1 {
+			end = start + partSize
+		}
+		u.Parts[i] = NewUploaderPart(i+1, start, end, partSize)
+		log.Logf(log.DEBUG, "part %d: full size: %d start %d end %d", i, u.File.Size(), start, end)
+	}
+}
+
+// WriteOut write out upload info
+func (u *Upload) WriteOutFileData2Upload(app string) {
+	//Write out preparation of file for upload
+	fmtd, err := json.MarshalIndent(u, "", "    ")
+
+	if bserr.NotErr(err) {
+		bucketDir := env.BuildBucketDir(u.AppName, u.Bucket)
+		iowriter.NewFileWriter()
+		fw := iowriter.NewFileWriter()
+		fw.WriteOut(fmtd, path.Join(bucketDir, env.UploadFolder))
+	}
+}
+
+// UpdateEtag update each etag
+func (u *Upload) UpdateEtag(partID int, appName, tag string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	for i, d := range u.Parts {
+		if d.PartID == uint64(partID) {
+			u.Parts[i].Etag = tag
+		}
+	}
+
+	u.WriteOutFileData2Upload(appName)
+}
+
+// RetrieveToUpload retrieve etag
+func (u *Upload) RetrieveToUpload() []*UploaderPart {
+	toUpload := make([]*UploaderPart, 0)
+	for _, d := range u.Parts {
+		if len(strings.TrimSpace(d.Etag)) <= 0 {
+			toUpload = append(toUpload, d)
+		}
+	}
+	return toUpload
+}
+
+// Completed has this finished
+func (u *Upload) Completed() bool {
+	var counter = 0
+
+	for _, d := range u.Parts {
+		if len(d.Etag) > 0 {
+			counter++
+		}
+	}
+	if counter == len(u.Parts) {
+		return true
+	}
+	return false
+}
+
+// Rtnd returned struct
+type Rtnd struct {
+	etag    string
+	upload  *Upload
+	mu      sync.Mutex
+}
+
+// NewRtnd create new Rtnd struct
+func NewRtnd(up *Upload) *Rtnd {
+	tmp := &Rtnd{upload: up}
+	return tmp
+}
+
+// Response set response
+func (r *Rtnd) Response(b []byte) {
+	//receives etag+^+partid
+	ar := strings.Split(string(b), "^")
+	r.etag = ar[0]
+	id, err := strconv.Atoi(ar[1])
+	bserr.WarnErr(err, "id not an integer on response")
+
+	fmt.Println(id, " Returned: ", r.etag)
+
+	r.upload.UpdateEtag(id, r.upload.AppName, r.etag)
+}
