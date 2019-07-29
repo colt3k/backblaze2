@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
+	"math/rand"
+	"time"
 
 	"github.com/colt3k/backblaze2/b2api"
 	"github.com/colt3k/backblaze2/errs"
@@ -14,25 +17,46 @@ import (
 )
 
 // ListKeys list account keys
-func ListKeys(authConfig b2api.AuthConfig) (*b2api.KeysResp, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	if perms.ListKeys(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+func (c *Cloud) ListKeys() (*b2api.KeysResp, errs.Error) {
+	if perms.ListKeys(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := b2api.ListKeyReq{
-			AccountId: authd.AccountID,
+			AccountId: c.AuthResponse.AccountID,
 		}
 
 		msg, errUn := caller.UnMarshalRequest(req)
 		if errUn != nil {
 			return nil, errs.New(errUn, "")
 		}
-		mapData, er := caller.MakeCall("POST", authd.APIURL+uri.B2ListKeys, bytes.NewReader(msg), header)
+		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2ListKeys, bytes.NewReader(msg), header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.ListKeys()
+				}
+			}
+
 			return nil, er
 		}
 
@@ -46,27 +70,24 @@ func ListKeys(authConfig b2api.AuthConfig) (*b2api.KeysResp, errs.Error) {
 	return nil, errs.New(fmt.Errorf("not allowed"), "")
 }
 
-// CreateKey create account key
-func CreateKey(authConfig b2api.AuthConfig, keyName, keyBucket string, capabilities []string) (*b2api.CreateKeyResp, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
 
-	if perms.CreateKeys(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+// CreateKey create account key
+func (c *Cloud) CreateKey(keyName, keyBucket string, capabilities []string) (*b2api.CreateKeyResp, errs.Error) {
+
+	if perms.CreateKeys(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		var req *b2api.CreateKeyReq
 		if len(keyBucket) > 0 {
 			req = &b2api.CreateKeyReq{
-				AccountId:    authd.AccountID,
+				AccountId:    c.AuthResponse.AccountID,
 				Capabilities: capabilities,
 				KeyName:      keyName,
 				BucketId:     keyBucket,
 			}
 		} else {
 			req = &b2api.CreateKeyReq{
-				AccountId:    authd.AccountID,
+				AccountId:    c.AuthResponse.AccountID,
 				Capabilities: capabilities,
 				KeyName:      keyName,
 			}
@@ -75,8 +96,33 @@ func CreateKey(authConfig b2api.AuthConfig, keyName, keyBucket string, capabilit
 		if errUn != nil {
 			return nil, errs.New(errUn, "")
 		}
-		mapData, er := caller.MakeCall("POST", authd.APIURL+uri.B2CreateKey, bytes.NewReader(msg), header)
+		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2CreateKey, bytes.NewReader(msg), header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.CreateKey(keyName, keyBucket, capabilities)
+				}
+			}
 			return nil, er
 		}
 
@@ -91,14 +137,10 @@ func CreateKey(authConfig b2api.AuthConfig, keyName, keyBucket string, capabilit
 }
 
 // DeleteKey delete account key
-func DeleteKey(authConfig b2api.AuthConfig, keyId string) (*b2api.DeleteKeyResp, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) DeleteKey(keyId string) (*b2api.DeleteKeyResp, errs.Error) {
 
-	if perms.DeleteKeys(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.DeleteKeys(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.DeleteKeyReq{
 			ApplicationKeyId: keyId,
@@ -107,8 +149,33 @@ func DeleteKey(authConfig b2api.AuthConfig, keyId string) (*b2api.DeleteKeyResp,
 		if errUn != nil {
 			return nil, errs.New(errUn, "")
 		}
-		mapData, er := caller.MakeCall("POST", authd.APIURL+uri.B2DeleteKey, bytes.NewReader(msg), header)
+		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2DeleteKey, bytes.NewReader(msg), header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.DeleteKey(keyId)
+				}
+			}
 			return nil, er
 		}
 

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"time"
 
 	log "github.com/colt3k/nglog/ng"
 
@@ -16,22 +18,17 @@ import (
 )
 
 // ListBuckets list out buckets for account
-func ListBuckets(authConfig b2api.AuthConfig, bucketId, bucketName string, bucketType []b2api.BucketType) (*b2api.ListBucketsResp, errs.Error) {
+func (c *Cloud) ListBuckets(bucketId, bucketName string, bucketType []b2api.BucketType) (*b2api.ListBucketsResp, errs.Error) {
 
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	if perms.ListBuckets(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.ListBuckets(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		bucketTypes := make([]string, 0)
 		for _, d := range bucketType {
 			bucketTypes = append(bucketTypes, d.String())
 		}
 		req := &b2api.ListBucketReq{
-			AccountID:   authd.AccountID,
+			AccountID:   c.AuthResponse.AccountID,
 			BucketID:    bucketId,
 			BucketName:  bucketName,
 			BucketTypes: bucketTypes,
@@ -40,8 +37,33 @@ func ListBuckets(authConfig b2api.AuthConfig, bucketId, bucketName string, bucke
 		if errUn != nil {
 			return nil, errs.New(errUn, "")
 		}
-		mapData, er := caller.MakeCall("POST", authd.APIURL+uri.B2ListBuckets, bytes.NewReader(msg), header)
+		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2ListBuckets, bytes.NewReader(msg), header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.ListBuckets(bucketId, bucketName, bucketType)
+				}
+			}
 			return nil, er
 		}
 		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
@@ -56,19 +78,13 @@ func ListBuckets(authConfig b2api.AuthConfig, bucketId, bucketName string, bucke
 }
 
 // CreateBucket create a bucket on account
-func CreateBucket(authConfig b2api.AuthConfig, bucketName string, bucketType b2api.BucketType,
+func (c *Cloud) CreateBucket(bucketName string, bucketType b2api.BucketType,
 	bucketInfo map[string]interface{}, corsRules []b2api.CorsRules, lifeCycleRules []b2api.LifecycleRules) (*b2api.CreateBucketResp, errs.Error) {
 
-	authd, err := auth.AuthorizeAccount(authConfig)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if perms.CreateBucket(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.CreateBucket(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 		req := b2api.CreateBucketReq{
-			AccountID:      authd.AccountID,
+			AccountID:      c.AuthResponse.AccountID,
 			BucketName:     bucketName,
 			BucketType:     bucketType.String(),
 			CorsRules:      corsRules,
@@ -79,8 +95,33 @@ func CreateBucket(authConfig b2api.AuthConfig, bucketName string, bucketType b2a
 			return nil, errs.New(errUn, "")
 		}
 		log.Logln(log.DEBUG, "Request:", string(msg))
-		mapData, er := caller.MakeCall("POST", authd.APIURL+uri.B2CreateBucket, bytes.NewReader(msg), header)
+		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2CreateBucket, bytes.NewReader(msg), header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.CreateBucket(bucketName, bucketType, bucketInfo, corsRules, lifeCycleRules)
+				}
+			}
 			return nil, er
 		}
 		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
@@ -95,19 +136,13 @@ func CreateBucket(authConfig b2api.AuthConfig, bucketName string, bucketType b2a
 }
 
 // UpdateBucket update bucket properties
-func UpdateBucket(authConfig b2api.AuthConfig, bucketId string, bucketType b2api.BucketType,
+func (c *Cloud) UpdateBucket(bucketId string, bucketType b2api.BucketType,
 	bucketInfo map[string]interface{}, corsRules []b2api.CorsRules, lifeCycleRules []b2api.LifecycleRules) (*b2api.CreateBucketResp, errs.Error) {
 
-	authd, err := auth.AuthorizeAccount(authConfig)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if perms.UpdateBucket(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.UpdateBucket(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 		req := b2api.UpdateBucketReq{
-			AccountID:      authd.AccountID,
+			AccountID:      c.AuthResponse.AccountID,
 			BucketID:       bucketId,
 			BucketType:     bucketType.String(),
 			CorsRules:      corsRules,
@@ -118,8 +153,33 @@ func UpdateBucket(authConfig b2api.AuthConfig, bucketId string, bucketType b2api
 			return nil, errs.New(errUn, "")
 		}
 		log.Logln(log.DEBUG, "Request:", string(msg))
-		mapData, er := caller.MakeCall("POST", authd.APIURL+uri.B2UpdateBucket, bytes.NewReader(msg), header)
+		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2UpdateBucket, bytes.NewReader(msg), header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.UpdateBucket(bucketId, bucketType, bucketInfo, corsRules, lifeCycleRules)
+				}
+			}
 			return nil, er
 		}
 		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
@@ -134,17 +194,12 @@ func UpdateBucket(authConfig b2api.AuthConfig, bucketId string, bucketType b2api
 }
 
 // DeleteBucket remove from account
-func DeleteBucket(authConfig b2api.AuthConfig, bucketId string) (*b2api.DeleteBucketResp, errs.Error) {
+func (c *Cloud) DeleteBucket(bucketId string) (*b2api.DeleteBucketResp, errs.Error) {
 
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	if perms.DeleteBucket(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.DeleteBucket(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 		req := b2api.DeleteBucketReq{
-			AccountID: authd.AccountID,
+			AccountID: c.AuthResponse.AccountID,
 			BucketID:  bucketId,
 		}
 		msg, errUn := caller.UnMarshalRequest(req)
@@ -153,8 +208,33 @@ func DeleteBucket(authConfig b2api.AuthConfig, bucketId string) (*b2api.DeleteBu
 		}
 		log.Logln(log.DEBUG, "Request:", string(msg))
 
-		mapData, er := caller.MakeCall("POST", authd.APIURL+uri.B2DeleteBucket, bytes.NewReader(msg), header)
+		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2DeleteBucket, bytes.NewReader(msg), header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.DeleteBucket(bucketId)
+				}
+			}
 			return nil, er
 		}
 		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))

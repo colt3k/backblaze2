@@ -71,16 +71,10 @@ func post(url string, req interface{}, header map[string]string) (map[string]int
 }
 
 // SendParts send parts to target
-func SendParts(b2Auth b2api.AuthConfig, up *Upload) bool {
+func (c *Cloud) SendParts(up *Upload) bool {
 
 	// This controls the Upload of PARTS using UploadPart
-	authd, err := auth.AuthorizeAccount(b2Auth)
-	if err != nil {
-		log.Logf(log.ERROR, "%+v", err)
-		return false
-	}
-
-	if perms.StartLargeFile(authd) {
+	if perms.StartLargeFile(c.AuthResponse) {
 
 		// Get parts we created earlier
 		parts := up.RetrieveToUpload()
@@ -102,7 +96,7 @@ func SendParts(b2Auth b2api.AuthConfig, up *Upload) bool {
 			//Create Task, send to worker
 			task := concur.NewTask(
 				func() (error, []byte) {
-					et := worker(b2Auth, up, d, partBuffer)
+					et := c.worker(up, d, partBuffer)
 					return nil, []byte(et)
 				},
 				NewRtnd(up))
@@ -120,7 +114,7 @@ func SendParts(b2Auth b2api.AuthConfig, up *Upload) bool {
 			for _, d := range parts {
 				shas = append(shas, d.Etag)
 			}
-			_, err := FinishLargeFileUpload(b2Auth, up.FileID, shas)
+			_, err := c.FinishLargeFileUpload(up.FileID, shas)
 			if err != nil {
 				return false
 			}
@@ -131,9 +125,9 @@ func SendParts(b2Auth b2api.AuthConfig, up *Upload) bool {
 	return false
 }
 
-func worker(b2Auth b2api.AuthConfig, up *Upload, p *UploaderPart, data []byte) string {
+func (c *Cloud) worker(up *Upload, p *UploaderPart, data []byte) string {
 
-	fupr, err := GetUploadPartURL(b2Auth, up.FileID)
+	fupr, err := c.GetUploadPartURL(up.FileID)
 	if err != nil {
 		return err.Error()
 	}
@@ -202,16 +196,16 @@ func NewUploaderPart(part uint64, start, end, size int64) *UploaderPart {
 }
 
 // UploadURL retrieve upload url
-func UploadURL(b2Auth *b2api.AuthorizationResp, bucketId string) (*b2api.UploadURLResp, errs.Error) {
+func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 
-	if perms.GetUploadURL(b2Auth) {
+	if perms.GetUploadURL(c.AuthResponse) {
 
-		header := auth.BuildAuthMap(b2Auth.AuthorizationToken)
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 		req := b2api.UploadURLReq{
 			BucketId: bucketId,
 		}
 
-		data, er := post(b2Auth.APIURL+uri.B2GetUploadURL, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2GetUploadURL, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -229,17 +223,13 @@ func UploadURL(b2Auth *b2api.AuthorizationResp, bucketId string) (*b2api.UploadU
 // UploadFile file name and info must fit in 7k byte limit,
 // 	the file to be uploaded is the message body and is not encoded in any way.
 //		it's not URL encoded, it's not MIME encoded
-func UploadFile(authConfig b2api.AuthConfig, bucketId, filePath string) (*b2api.UploadResp, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) UploadFile(bucketId, filePath string) (*b2api.UploadResp, errs.Error) {
 
-	if perms.UploadFile(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
-		upURL, er := UploadURL(authd, bucketId)
-		if err != nil {
-			return nil, err
+	if perms.UploadFile(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
+		upURL, er := c.UploadURL(bucketId)
+		if er != nil {
+			return nil, er
 		}
 
 		// Process File
@@ -296,17 +286,13 @@ func UploadFile(authConfig b2api.AuthConfig, bucketId, filePath string) (*b2api.
 	return nil, errs.New(fmt.Errorf("not allowed"), "")
 }
 
-func UploadVirtualFile(authConfig b2api.AuthConfig, bucketId, fname string, data []byte, lastMod int64) (*b2api.UploadResp, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod int64) (*b2api.UploadResp, errs.Error) {
 
-	if perms.UploadFile(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
-		upURL, er := UploadURL(authd, bucketId)
-		if err != nil {
-			return nil, err
+	if perms.UploadFile(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
+		upURL, er := c.UploadURL(bucketId)
+		if er != nil {
+			return nil, er
 		}
 
 		name := url.URL{Path: fname}
@@ -346,14 +332,10 @@ func UploadVirtualFile(authConfig b2api.AuthConfig, bucketId, fname string, data
 }
 
 // ListFiles list files by name or all in bucket
-func ListFiles(authConfig b2api.AuthConfig, bucketId, filename string) (*b2api.ListFilesResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) ListFiles(bucketId, filename string) (*b2api.ListFilesResponse, errs.Error) {
 
-	if perms.ListFileNames(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.ListFileNames(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.ListFileReq{
 			BucketID:      bucketId,
@@ -363,7 +345,7 @@ func ListFiles(authConfig b2api.AuthConfig, bucketId, filename string) (*b2api.L
 			Delimiter:     "",
 		}
 
-		data, er := post(authd.APIURL+uri.B2ListFileNames, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2ListFileNames, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -379,14 +361,10 @@ func ListFiles(authConfig b2api.AuthConfig, bucketId, filename string) (*b2api.L
 }
 
 // ListFileVersions lists out all versions of file
-func ListFileVersions(authConfig b2api.AuthConfig, bucketId, fileName string) (*b2api.ListFileVersionsResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVersionsResponse, errs.Error) {
 
-	if perms.ListFileVersions(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.ListFileVersions(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.ListFileVersionsReq{
 			BucketID:      bucketId,
@@ -397,7 +375,7 @@ func ListFileVersions(authConfig b2api.AuthConfig, bucketId, fileName string) (*
 			Delimiter:     "",
 		}
 
-		data, er := post(authd.APIURL+uri.B2ListFileVersions, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2ListFileVersions, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -413,21 +391,17 @@ func ListFileVersions(authConfig b2api.AuthConfig, bucketId, fileName string) (*
 }
 
 // DeleteFile deletes file version by file id
-func DeleteFile(authConfig b2api.AuthConfig, fileName, fileID string) (*b2api.DeleteFileVersionResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) DeleteFile(fileName, fileID string) (*b2api.DeleteFileVersionResponse, errs.Error) {
 
-	if perms.DeleteFiles(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.DeleteFiles(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.DeleteFileVersionReq{
 			FileName: fileName,
 			FileID:   fileID,
 		}
 
-		data, er := post(authd.APIURL+uri.B2DeleteFileVersion, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2DeleteFileVersion, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -443,21 +417,17 @@ func DeleteFile(authConfig b2api.AuthConfig, fileName, fileID string) (*b2api.De
 }
 
 // HideFile hides file by putting 0 content length in history
-func HideFile(authConfig b2api.AuthConfig, bucketId, fileName string) (*b2api.HideFileResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) HideFile(bucketId, fileName string) (*b2api.HideFileResponse, errs.Error) {
 
-	if perms.HideFile(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.HideFile(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.HideFileReq{
 			BucketId: bucketId,
 			FileName: fileName,
 		}
 
-		data, er := post(authd.APIURL+uri.B2HideFile, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2HideFile, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -473,20 +443,16 @@ func HideFile(authConfig b2api.AuthConfig, bucketId, fileName string) (*b2api.Hi
 }
 
 // GetFileInfo provides file information
-func GetFileInfo(authConfig b2api.AuthConfig, fileID string) (*b2api.GetFileInfoResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) GetFileInfo(fileID string) (*b2api.GetFileInfoResponse, errs.Error) {
 
-	if perms.GetFileInfo(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.GetFileInfo(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.GetFileInfoReq{
 			FileID: fileID,
 		}
 
-		data, er := post(authd.APIURL+uri.B2GetFileInfo, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2GetFileInfo, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -508,14 +474,10 @@ func GetFileInfo(authConfig b2api.AuthConfig, fileID string) (*b2api.GetFileInfo
 }
 
 // GetDownloadAuth required prior to download
-func GetDownloadAuth(authConfig b2api.AuthConfig, bucketID, filenamePrefix string, validDurationInSeconds int64) (*b2api.DownloadAuthResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationInSeconds int64) (*b2api.DownloadAuthResponse, errs.Error) {
 
-	if perms.GetDownloadAuth(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.GetDownloadAuth(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.DownloadAuthReq{
 			BucketId:               bucketID,
@@ -524,7 +486,7 @@ func GetDownloadAuth(authConfig b2api.AuthConfig, bucketID, filenamePrefix strin
 			B2ContentDisposition:   "",
 		}
 
-		data, er := post(authd.APIURL+uri.B2GetDownloadAuth, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2GetDownloadAuth, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -553,18 +515,13 @@ In map:
 PLUS:
 	X-Bz-Info-* headers for any custom file info during upload
 */
-func DownloadByName(authConfig b2api.AuthConfig, bucketName, fileName string) (map[string]interface{}, errs.Error) {
-	// Only required when bucket is private
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interface{}, errs.Error) {
 
-	if perms.DownloadFile(authd) {
+	if perms.DownloadFile(c.AuthResponse) {
 
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
-		url := authd.DownloadURL + "/file/" + bucketName + "/" + fileName+"?Authorization="+authd.AuthorizationToken+"&b2-content-disposition=large_file_sha1"
+		url := c.AuthResponse.DownloadURL + "/file/" + bucketName + "/" + fileName+"?Authorization="+c.AuthResponse.AuthorizationToken+"&b2-content-disposition=large_file_sha1"
 		mapData, er := caller.MakeCall("GET", url, nil, header)
 		if er != nil {
 			return nil, er
@@ -589,17 +546,12 @@ In map:
 PLUS:
 	X-Bz-Info-* headers for any custom file info during upload
 */
-func DownloadByID(authConfig b2api.AuthConfig, fileID string) (map[string]interface{}, errs.Error) {
-	// Only required when bucket is private
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) DownloadByID(fileID string) (map[string]interface{}, errs.Error) {
 
-	if perms.DownloadFile(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.DownloadFile(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
-		url := authd.DownloadURL + uri.B2DownloadFileById + "?fileId=" + fileID
+		url := c.AuthResponse.DownloadURL + uri.B2DownloadFileById + "?fileId=" + fileID
 		mapData, er := caller.MakeCall("GET", url, nil, header)
 		if er != nil {
 			return nil, er
@@ -611,14 +563,10 @@ func DownloadByID(authConfig b2api.AuthConfig, fileID string) (map[string]interf
 }
 
 // StartLargeFile create initial start call
-func StartLargeFile(authConfig b2api.AuthConfig, bucketID, fileInfo string, f file.File) (*b2api.StartLargeFileResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) StartLargeFile(bucketID, fileInfo string, f file.File) (*b2api.StartLargeFileResponse, errs.Error) {
 
-	if perms.StartLargeFile(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.StartLargeFile(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		// build sha1 and include as file info 'large_file_sha1'
 		// create sha1 hash and encode it
@@ -633,7 +581,7 @@ func StartLargeFile(authConfig b2api.AuthConfig, bucketID, fileInfo string, f fi
 			FileInfo:    b2api.FileInfo{SrcLastModifiedMillis: mathut.FmtInt(int(fm.LastMod())), LargeFileSha1:sha1hash},
 		}
 
-		data, er := post(authd.APIURL+uri.B2StartLargeFile, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2StartLargeFile, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -648,20 +596,16 @@ func StartLargeFile(authConfig b2api.AuthConfig, bucketID, fileInfo string, f fi
 	return nil, errs.New(fmt.Errorf("not allowed"), "")
 }
 
-func GetUploadPartURL(authConfig b2api.AuthConfig, fileID string) (*b2api.GetFileUploadPartResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) GetUploadPartURL(fileID string) (*b2api.GetFileUploadPartResponse, errs.Error) {
 
-	if perms.GetUploadPartURL(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.GetUploadPartURL(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.GetFileUploadPartReq{
 			FileID: fileID,
 		}
 
-		data, er := post(authd.APIURL+uri.B2GetUploadPartURL, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2GetUploadPartURL, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -676,14 +620,10 @@ func GetUploadPartURL(authConfig b2api.AuthConfig, fileID string) (*b2api.GetFil
 	return nil, errs.New(fmt.Errorf("not allowed"), "")
 }
 
-func ListPartsURL(authConfig b2api.AuthConfig, fileID string, startPartNo, maxPartCount int64) (*b2api.ListPartsResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) ListPartsURL(fileID string, startPartNo, maxPartCount int64) (*b2api.ListPartsResponse, errs.Error) {
 
-	if perms.ListParts(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.ListParts(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.ListPartsReq{
 			FileID:          fileID,
@@ -691,7 +631,7 @@ func ListPartsURL(authConfig b2api.AuthConfig, fileID string, startPartNo, maxPa
 			MaxPartCount:    maxPartCount,
 		}
 
-		data, er := post(authd.APIURL+uri.B2ListParts, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2ListParts, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -707,14 +647,10 @@ func ListPartsURL(authConfig b2api.AuthConfig, fileID string, startPartNo, maxPa
 }
 
 // ListUnfinishLargeFiles show unfinished large file uploads
-func ListUnfinishedLargeFiles(authConfig b2api.AuthConfig, bucketID string) (*b2api.ListUnfinishedLargeFilesResponse, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) ListUnfinishedLargeFiles(bucketID string) (*b2api.ListUnfinishedLargeFilesResponse, errs.Error) {
 
-	if perms.ListUnfinishedLargeFiles(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.ListUnfinishedLargeFiles(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.ListUnfinishedLargeFilesReq{
 			BucketId:     bucketID,
@@ -723,7 +659,7 @@ func ListUnfinishedLargeFiles(authConfig b2api.AuthConfig, bucketID string) (*b2
 			MaxFileCount: 100,
 		}
 
-		data, er := post(authd.APIURL+uri.B2ListUnfinishedLargeFiles, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2ListUnfinishedLargeFiles, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -739,20 +675,15 @@ func ListUnfinishedLargeFiles(authConfig b2api.AuthConfig, bucketID string) (*b2
 }
 
 // FinishLargeFileUpload call complete on large upload
-func FinishLargeFileUpload(authConfig b2api.AuthConfig, fileId string, sha1Array []string) (*b2api.FinishUpLgFileResp, errs.Error) {
+func (c *Cloud) FinishLargeFileUpload(fileId string, sha1Array []string) (*b2api.FinishUpLgFileResp, errs.Error) {
 
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	if perms.FinishLargeFile(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.FinishLargeFile(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 		req := &b2api.FinishUpLgFileReq{
 			FileId: fileId,
 			Sha1Ar: sha1Array,
 		}
-		data, er := post(authd.APIURL+uri.B2FinishLargeFile, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2FinishLargeFile, req, header)
 		if er != nil {
 			return nil, er
 		}
@@ -769,19 +700,15 @@ func FinishLargeFileUpload(authConfig b2api.AuthConfig, fileId string, sha1Array
 }
 
 // CancelLargeFile cancel large file upload process
-func CancelLargeFile(authConfig b2api.AuthConfig, fileId string) (*b2api.CanxUpLgFileResp, errs.Error) {
-	authd, err := auth.AuthorizeAccount(authConfig)
-	if err != nil {
-		return nil, err
-	}
+func (c *Cloud) CancelLargeFile(fileId string) (*b2api.CanxUpLgFileResp, errs.Error) {
 
-	if perms.CancelLargeFile(authd) {
-		header := auth.BuildAuthMap(authd.AuthorizationToken)
+	if perms.CancelLargeFile(c.AuthResponse) {
+		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.CanxUpLgFileReq{
 			FileId: fileId,
 		}
-		data, er := post(authd.APIURL+uri.B2CancelLargeFile, req, header)
+		data, er := post(c.AuthResponse.APIURL+uri.B2CancelLargeFile, req, header)
 		if er != nil {
 			return nil, er
 		}
