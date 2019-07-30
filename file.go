@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"net/url"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/colt3k/nglog/ers/bserr"
 	log "github.com/colt3k/nglog/ng"
@@ -207,6 +209,31 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2GetUploadURL, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.UploadURL(bucketId)
+				}
+			}
 			return nil, er
 		}
 
@@ -347,6 +374,31 @@ func (c *Cloud) ListFiles(bucketId, filename string) (*b2api.ListFilesResponse, 
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2ListFileNames, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.ListFiles(bucketId, filename)
+				}
+			}
 			return nil, er
 		}
 
@@ -377,6 +429,31 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2ListFileVersions, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.ListFileVersions(bucketId, fileName)
+				}
+			}
 			return nil, er
 		}
 
@@ -403,6 +480,31 @@ func (c *Cloud) DeleteFile(fileName, fileID string) (*b2api.DeleteFileVersionRes
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2DeleteFileVersion, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.DeleteFile(fileName, fileID)
+				}
+			}
 			return nil, er
 		}
 
@@ -429,6 +531,31 @@ func (c *Cloud) HideFile(bucketId, fileName string) (*b2api.HideFileResponse, er
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2HideFile, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.HideFile(bucketId, fileName)
+				}
+			}
 			return nil, er
 		}
 
@@ -454,6 +581,31 @@ func (c *Cloud) GetFileInfo(fileID string) (*b2api.GetFileInfoResponse, errs.Err
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2GetFileInfo, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.GetFileInfo(fileID)
+				}
+			}
 			return nil, er
 		}
 
@@ -488,6 +640,31 @@ func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationIn
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2GetDownloadAuth, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.GetDownloadAuth(bucketID, filenamePrefix, validDurationInSeconds)
+				}
+			}
 			return nil, er
 		}
 
@@ -583,6 +760,31 @@ func (c *Cloud) StartLargeFile(bucketID, fileInfo string, f file.File) (*b2api.S
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2StartLargeFile, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.StartLargeFile(bucketID, fileInfo, f)
+				}
+			}
 			return nil, er
 		}
 
@@ -607,6 +809,31 @@ func (c *Cloud) GetUploadPartURL(fileID string) (*b2api.GetFileUploadPartRespons
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2GetUploadPartURL, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.GetUploadPartURL(fileID)
+				}
+			}
 			return nil, er
 		}
 
@@ -633,6 +860,31 @@ func (c *Cloud) ListPartsURL(fileID string, startPartNo, maxPartCount int64) (*b
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2ListParts, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.ListPartsURL(fileID, startPartNo, maxPartCount)
+				}
+			}
 			return nil, er
 		}
 
@@ -661,6 +913,31 @@ func (c *Cloud) ListUnfinishedLargeFiles(bucketID string) (*b2api.ListUnfinished
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2ListUnfinishedLargeFiles, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.ListUnfinishedLargeFiles(bucketID)
+				}
+			}
 			return nil, er
 		}
 
@@ -685,6 +962,31 @@ func (c *Cloud) FinishLargeFileUpload(fileId string, sha1Array []string) (*b2api
 		}
 		data, er := post(c.AuthResponse.APIURL+uri.B2FinishLargeFile, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.FinishLargeFileUpload(fileId, sha1Array)
+				}
+			}
 			return nil, er
 		}
 
@@ -710,6 +1012,31 @@ func (c *Cloud) CancelLargeFile(fileId string) (*b2api.CanxUpLgFileResp, errs.Er
 		}
 		data, er := post(c.AuthResponse.APIURL+uri.B2CancelLargeFile, req, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.CancelLargeFile(fileId)
+				}
+			}
 			return nil, er
 		}
 
@@ -747,17 +1074,20 @@ type Upload struct {
 }
 
 // New create upload object
-func New(bucketName, filepath, appName string) *Upload {
+func NewUploader(bucketName, filepath string) *Upload {
 	t := new(Upload)
 	t.Bucket = bucketName
 	t.Filepath = filepath
 	t.File = filenative.NewFile(t.Filepath)
-	t.AppName = appName
+	t.AppName = AppFolderName
 	return t
 }
 
 // Available file exists
 func (u *Upload) Available() bool {
+	if len(strings.TrimSpace(u.Filepath)) <= 0 {
+		return false
+	}
 	return u.File.Available()
 }
 
@@ -853,6 +1183,65 @@ func (u *Upload) WriteOutFileData2Upload(app string) {
 		fw := iowriter.NewFileWriter()
 		fw.WriteOut(fmtd, path.Join(bucketDir, env.UploadFolder))
 	}
+}
+
+func (u *Upload) Process(c *Cloud) (string, error) {
+	// Find bucketId by name
+	bkts, err := c.ListBuckets("", u.Bucket, nil)
+	if err != nil {
+		return "",err
+	}
+	if len(bkts.Buckets) <= 0 {
+		return "", fmt.Errorf("no buckets found")
+	}
+	bucket := bkts.Buckets[0]
+
+	if u.ValidateOverMinPartSize() && u.ValidateSize() {
+		// determine amount of parts required
+		err := u.ComputePartTotal()
+		if err != nil {
+			return "", err
+		}
+
+		// Trigger Multipart with a Start
+		strtLgFileResp, err := c.StartLargeFile(bucket.BucketID, "", u.File)
+		if err != nil {
+			return "", err
+		}
+		// Setup for uploading of parts
+		u.SetupPartSizes(strtLgFileResp.FileID)
+		// Write file out to localhost in order to recover from failure
+		u.WriteOutFileData2Upload(AppFolderName)
+
+		// Start sending parts
+		if c.SendParts(u) {
+			log.Logf(log.INFO, "Upload Completed successfully into %s", u.Bucket)
+			uploadFile := UploaderDir(u.Bucket)
+			log.Logf(log.INFO, "removing upload file %s", uploadFile)
+			if !file.Delete(uploadFile) {
+				log.Logf(log.WARN, "upload file not removed %s", uploadFile)
+			}
+			return u.FileID, nil
+		} else {
+			return "", fmt.Errorf("upload failed, try again later")
+		}
+
+	} else if !u.ValidateOverMinPartSize() {
+
+		rsp, err := c.UploadFile(bucket.BucketID, u.Filepath)
+		if err != nil {
+			return "", err
+		}
+		if rsp != nil {
+			log.Logf(log.INFO,"Uploaded fileID: ", rsp.FileID)
+			return rsp.FileID, nil
+		}
+
+	} else {
+		return "", fmt.Errorf("file too large for upload, over %d TB", MaxUploadTB)
+	}
+
+	return "",nil
 }
 
 // UpdateEtag update each etag

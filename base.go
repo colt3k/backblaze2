@@ -3,11 +3,13 @@ package backblaze2
 import (
 	"encoding/json"
 	"math/rand"
+	"path/filepath"
 	"time"
 
 	log "github.com/colt3k/nglog/ng"
 	"github.com/colt3k/utils/encode"
 	"github.com/colt3k/utils/encode/encodeenum"
+	"github.com/colt3k/utils/file"
 
 	"github.com/colt3k/backblaze2/b2api"
 	"github.com/colt3k/backblaze2/errs"
@@ -16,8 +18,13 @@ import (
 	"github.com/colt3k/backblaze2/internal/uri"
 )
 
+const (
+	AppFolderName = ".cloudstore"
+	// UploadFolder exported folder name
+	UploadFolder = "upload"
+	MaxAuthTry  = 3
+)
 var AuthCounter = 0
-var MaxAuthTry  = 3
 
 type Cloud struct {
 	AuthConfig   b2api.AuthConfig
@@ -27,20 +34,16 @@ type Cloud struct {
 func CloudStore(accountId, appId string) *Cloud {
 	t := new(Cloud)
 	t.AuthConfig = b2api.AuthConfig{AccountID: accountId, ApplicationID: appId, Clear: false, AppName: "example"}
-	authd, err := t.AuthAccount()
-	if err != nil {
-		panic(err)
-	}
-	t.AuthResponse = authd
+	t.AuthAccount()
 	return t
 }
 
-func (c *Cloud) AuthAccount() (*b2api.AuthorizationResp, errs.Error) {
+func (c *Cloud) AuthAccount() {
 	// if it exists and is less than 24hrs old use it first, otherwise renew it
 	token := env.Token(c.AuthConfig.AppName, c.AuthConfig.Clear)
 	if token != nil {
 		log.Logln(log.DEBUG, "returning existing token")
-		return token, nil
+		c.AuthResponse = token
 	}
 
 	header := make(map[string]string)
@@ -51,7 +54,6 @@ func (c *Cloud) AuthAccount() (*b2api.AuthorizationResp, errs.Error) {
 	header["X-Bz-Test-Mode"] = "expire_some_account_authorization_tokens"
 	log.Logln(log.DEBUG, "obtaining new token")
 	mapData, ers := caller.MakeCall("GET", uri.B2AuthAccount, nil, header)
-
 	if ers != nil {
 		if ers.Code() == "bad_auth_token" || ers.Code() == "expired_auth_token" || ers.Code() == "service_unavailable" {
 			if ers.Code() == "bad_auth_token" || ers.Code() == "expired_auth_token" {
@@ -74,19 +76,30 @@ func (c *Cloud) AuthAccount() (*b2api.AuthorizationResp, errs.Error) {
 					time.Sleep(sleep)
 				}
 				c.AuthConfig.Clear = true
-				return c.AuthAccount()
+				c.AuthAccount()
+				return
 			}
 		}
-		return nil, ers
+		panic(ers)
 	}
 	b2Response := &b2api.AuthorizationResp{}
 	errUn := json.Unmarshal(mapData["body"].([]byte), b2Response)
 	if errUn != nil {
-		return nil, errs.New(errUn, "")
+		panic(errs.New(errUn, ""))
 	}
 	if b2Response != nil && len(b2Response.AuthorizationToken) > 0 {
 		//write out
 		env.WriteToken(c.AuthConfig.AppName, mapData["body"].([]byte))
 	}
-	return b2Response, nil
+	c.AuthResponse = b2Response
+}
+
+// UploaderDir build uploader directory
+func UploaderDir(bucketName string) string {
+	home := file.HomeFolder()
+	appPath := filepath.Join(home, AppFolderName)
+	bktPath := filepath.Join(appPath, bucketName)
+	uploadsFile := filepath.Join(bktPath, UploadFolder)
+
+	return uploadsFile
 }
