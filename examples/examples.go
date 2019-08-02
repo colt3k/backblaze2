@@ -6,8 +6,6 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/colt3k/backblaze2"
-	"github.com/colt3k/backblaze2/b2api"
 	log "github.com/colt3k/nglog/ng"
 	"github.com/colt3k/utils/encode"
 	"github.com/colt3k/utils/encode/encodeenum"
@@ -15,7 +13,9 @@ import (
 	"github.com/colt3k/utils/hash/hashenum"
 	"github.com/colt3k/utils/hash/sha1"
 	iout "github.com/colt3k/utils/io"
-	"github.com/colt3k/utils/ques"
+
+	"github.com/colt3k/backblaze2"
+	"github.com/colt3k/backblaze2/b2api"
 )
 
 const (
