@@ -1,10 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 
 	"github.com/colt3k/backblaze2"
 	"github.com/colt3k/backblaze2/b2api"
+	log "github.com/colt3k/nglog/ng"
+	"github.com/colt3k/utils/encode"
+	"github.com/colt3k/utils/encode/encodeenum"
+	"github.com/colt3k/utils/file/filenative"
+	"github.com/colt3k/utils/hash/hashenum"
+	"github.com/colt3k/utils/hash/sha1"
+	iout "github.com/colt3k/utils/io"
+	"github.com/colt3k/utils/ques"
 )
 
 const (
@@ -14,7 +25,7 @@ const (
 
 var (
 	bucketName = "testbucket"
-	filePath = ""
+	filePath   = ""
 )
 
 func main() {
@@ -163,6 +174,191 @@ func UploadFile() error {
 		fmt.Println("Uploaded FileID: ", fileId)
 	} else {
 		fmt.Println("file not found")
+	}
+
+	return nil
+}
+
+func DownloadFile() error {
+	c := setupCloud()
+
+	localFilePath := "."
+	rsp, err := c.DownloadByName("1234567890", "myfile.txt")
+	if err != nil {
+		return err
+	}
+
+	if rsp != nil {
+
+		sha1Val := rsp["X-Bz-Info-Large_file_sha1"].([]string)[0]
+		name := rsp["X-Bz-File-Name"].([]string)[0]
+		// Read file data
+		r := bytes.NewReader(rsp["body"].([]byte))
+		b, er := ioutil.ReadAll(r)
+		if er != nil {
+			return er
+		}
+
+		// WRITE to local
+		lclPath := filepath.Join(localFilePath, name)
+		i, er := iout.WriteOut(b, lclPath)
+		if er != nil {
+			return er
+		}
+		log.Logf(log.DEBUG, "wrote out %d", i)
+
+		// Validate file by sha1
+		f := filenative.NewFile(lclPath)
+		// create sha1 hash from saved file
+		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
+		// Compare hash to original
+		if sha1hash != sha1Val {
+			fmt.Errorf("downloaded file doesn't match remote by sha1")
+		}
+	}
+
+	return nil
+}
+
+func DownloadFileById() error {
+
+	c := setupCloud()
+	localFilePath := "."
+	rsp, err := c.DownloadByID("1234567890")
+	if err != nil {
+		return err
+	}
+
+	if rsp != nil {
+		name := rsp["X-Bz-File-Name"].([]string)[0]
+		sha1Val := rsp["X-Bz-Info-Large_file_sha1"].([]string)[0]
+
+		// Read file data
+		r := bytes.NewReader(rsp["body"].([]byte))
+		b, er := ioutil.ReadAll(r)
+		if er != nil {
+			return er
+		}
+
+		lclPath := filepath.Join(localFilePath, name)
+		i, er := iout.WriteOut(b, lclPath)
+		if er != nil {
+			return er
+		}
+		log.Logf(log.DEBUG, "wrote out %d", i)
+
+		// Validate file by sha1
+		f := filenative.NewFile(lclPath)
+		// Create sha1 hash and encode it
+		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
+		// Compare hash to original
+		if sha1hash != sha1Val {
+			return fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
+		}
+	}
+
+	return nil
+}
+
+func DeleteFile() error {
+	c := setupCloud()
+
+	r, err := c.DeleteFile("filename", "fileID")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("deleted %s %s", r.FileName, r.FileID)
+
+	return nil
+}
+
+func DeleteAllFileVersions() error {
+	c := setupCloud()
+
+	files, err := c.ListFileVersions("1234567890", "myfile.txt")
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files.Files {
+		log.Printf("Deleting: %s %s\n", f.FileName, f.FileID)
+		r, err := c.DeleteFile(f.FileName, f.FileID)
+		if err != nil {
+			break
+		}
+		fmt.Printf("deleted %s %s", r.FileName, r.FileID)
+	}
+
+	return nil
+}
+
+func HideFile() error {
+	c := setupCloud()
+
+	r, err := c.HideFile("1234567890", "myfile.txt")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("hidden %s %s", r.FileName, r.FileID)
+
+	return nil
+}
+
+func GetFileInfo() error {
+	c := setupCloud()
+
+	r, err := c.GetFileInfo("fileID")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("FileInfo: %s - %s", r.FileName, r.FileID)
+
+	return nil
+}
+
+func ListUnfinishedParts() error {
+	c := setupCloud()
+
+	r, err := c.ListUnfinishedLargeFiles("1234567890")
+	if err != nil {
+		return err
+	}
+
+	for i,k := range r.Files {
+		fmt.Printf("%d Part: %s %d %d - %s", i, k.FileName, k.ContentLength, k.UploadTimestamp, k.FileID)
+	}
+
+
+	return nil
+}
+
+func CancelUnfinishedLargeUpload() error {
+	c := setupCloud()
+
+	r, err := c.CancelLargeFile("fileID")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Cancelled: %s - %s", r.FileName, r.FileId)
+
+	return nil
+}
+
+func ListBucketSize() error {
+	c := setupCloud()
+
+	var bucketSize int64
+	r, err := c.ListFileVersions("1234567890", "")
+	if err != nil {
+		return err
+	}
+	if r != nil {
+		for _, d := range r.Files {
+			bucketSize += d.ContentLength
+		}
 	}
 
 	return nil

@@ -701,6 +701,31 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 		url := c.AuthResponse.DownloadURL + "/file/" + bucketName + "/" + fileName+"?Authorization="+c.AuthResponse.AuthorizationToken+"&b2-content-disposition=large_file_sha1"
 		mapData, er := caller.MakeCall("GET", url, nil, header)
 		if er != nil {
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.DownloadByName(bucketName, fileName)
+				}
+			}
 			return nil, er
 		}
 
