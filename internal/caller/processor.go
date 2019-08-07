@@ -50,7 +50,7 @@ func (h *HttpCall) HttpCall(data io.Reader) (map[string]interface{}, errs.Error)
 		defer resp.Body.Close()
 	}
 	// 202 occurs when a http.DELETE is ran
-	if err != nil && err.Error() != "202 Accepted" {
+	if err != nil && err.Error() != "202 Accepted" && strings.TrimSpace(err.Error()) != "206" {
 		er := errs.New(err, "")
 		if resp != nil {
 			er.SetMessage("on " + h.URL)

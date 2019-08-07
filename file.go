@@ -41,6 +41,7 @@ import (
 
 const fileChunk = 10 * (1 << 20)
 const fileChunkLg = 100 * (1 << 20)
+const DownloadFileChunk = 10 * (1 << 20)
 const (
 	// MinPartSize in MB
 	MinPartSize = 6
@@ -749,12 +750,15 @@ In map:
 PLUS:
 	X-Bz-Info-* headers for any custom file info during upload
 */
-func (c *Cloud) DownloadByID(fileID string) (map[string]interface{}, errs.Error) {
+func (c *Cloud) DownloadByID(fileID, byteRange string) (map[string]interface{}, errs.Error) {
 
 	if perms.DownloadFile(c.AuthResponse) {
 		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		url := c.AuthResponse.DownloadURL + uri.B2DownloadFileById + "?fileId=" + fileID
+		if len(byteRange) > 0 {
+			header["Range"] =byteRange
+		}
 		mapData, er := caller.MakeCall("GET", url, nil, header)
 		if er != nil {
 			return nil, er

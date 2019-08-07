@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
+	"os"
 	"path/filepath"
 
 	log "github.com/colt3k/nglog/ng"
@@ -13,23 +15,27 @@ import (
 	"github.com/colt3k/utils/hash/hashenum"
 	"github.com/colt3k/utils/hash/sha1"
 	iout "github.com/colt3k/utils/io"
+	"github.com/colt3k/utils/mathut"
 
 	"github.com/colt3k/backblaze2"
 	"github.com/colt3k/backblaze2/b2api"
 )
 
-const (
-	ACCT_ID = ""
-	APP_ID  = ""
-)
-
 var (
-	bucketName = "testbucket"
-	filePath   = ""
+	ACCT_ID = os.Getenv("ACCT_ID")
+	APP_ID  = os.Getenv("APP_ID")
+	bucketName = "ctcloudsync"
+	bucketID = "f5e8ff6218490eb66093001f"
+	filePath   = "/Users/gcollins/Downloads/MINE/gparted-live-0.33.0-1-i686.iso"
+	fileID = "4_zf5e8ff6218490eb66093001f_f2051b8c8ba09564c_d20190807_m194535_c001_v0001116_t0025"
 )
 
 func main() {
-	er := UploadFile()
+	if len(ACCT_ID) <= 0 || len(APP_ID) <= 0 {
+		fmt.Println("ACCT_ID and/or APP_ID not defined")
+		os.Exit(-1)
+	}
+	er := DownloadFileByID2()
 	if er != nil {
 		fmt.Printf("%v", er)
 	}
@@ -109,7 +115,7 @@ func CreateBucket() error {
 func DeleteBucket() error {
 	c := setupCloud()
 
-	r, err := c.DeleteBucket("1234567890")
+	r, err := c.DeleteBucket(bucketID)
 	if err != nil {
 		return err
 	}
@@ -122,7 +128,7 @@ func DeleteBucket() error {
 func CreateVirtualFile() error {
 	c := setupCloud()
 
-	r, err := c.UploadVirtualFile("1234567890", "myfile.txt", []byte("test content"), 0)
+	r, err := c.UploadVirtualFile(bucketID, "myfile.txt", []byte("test content"), 0)
 	if err != nil {
 		return err
 	}
@@ -135,7 +141,7 @@ func CreateVirtualFile() error {
 func ListFileVersions() error {
 	c := setupCloud()
 
-	r, err := c.ListFileVersions("1234567890", "myfile.txt")
+	r, err := c.ListFileVersions(bucketID, "myfile.txt")
 	if err != nil {
 		return err
 	}
@@ -150,7 +156,7 @@ func ListFileVersions() error {
 func ListFiles() error {
 	c := setupCloud()
 
-	r, err := c.ListFiles("1234567890", "")
+	r, err := c.ListFiles(bucketID, "")
 	if err != nil {
 		return err
 	}
@@ -183,7 +189,7 @@ func DownloadFile() error {
 	c := setupCloud()
 
 	localFilePath := "."
-	rsp, err := c.DownloadByName("1234567890", "myfile.txt")
+	rsp, err := c.DownloadByName(bucketName, "myfile.txt")
 	if err != nil {
 		return err
 	}
@@ -220,11 +226,107 @@ func DownloadFile() error {
 	return nil
 }
 
+func DownloadFileByID2() error {
+	var size int64 = 0 //301040503
+	c := setupCloud()
+	localFilePath := "/Users/gcollins/Desktop"
+	r, err := c.GetFileInfo(fileID)
+	if err != nil {
+		return err
+	}
+	fmt.Println(r.ContentLength)
+	size = r.ContentLength
+	// If over 200MB multipart download
+
+	totalPartsCount := uint64(math.Ceil(float64(size) / float64(backblaze2.DownloadFileChunk)))
+
+	if size > 200000000 {
+		sha1Val := ""
+		lclPath := ""
+		fmt.Println("file over 200MB, total parts to download", totalPartsCount)
+		parts := make([]*backblaze2.UploaderPart, totalPartsCount)
+		var lastsize, start, end int64
+
+		for i := uint64(0); i < totalPartsCount; i++ {
+			// file size - this chunk is the size of the part
+			partSize := int64(math.Min(backblaze2.DownloadFileChunk, float64(size-int64(i*backblaze2.DownloadFileChunk))))
+
+			//first time through set to partSize
+			if lastsize == 0 {
+				lastsize = partSize	//10485760
+			}
+
+			// start is equal to the loop id multiplied by lastsize
+			start = int64(i) * lastsize
+			if start == 0 {
+				end = lastsize -1
+			} else {
+				end = start + lastsize -1
+			}
+			if i == totalPartsCount-1 {
+				end = start + partSize
+			}
+			parts[i] = backblaze2.NewUploaderPart(i+1, start, end, partSize)
+			fmt.Printf("part %d: full size: %d start %d end %d\n", i, size, start, end)
+		}
+
+		var file *os.File
+		var err2 error
+		var written int
+		for i,j := range parts {
+
+			rsp, err := c.DownloadByID(r.FileID, "bytes="+mathut.FmtInt(int(j.Start))+"-"+mathut.FmtInt(int(j.End)))
+			if err != nil {
+				return err
+			}
+			if rsp != nil {
+				sha1Val = rsp["X-Bz-Info-Large_file_sha1"].([]string)[0]
+				name := rsp["X-Bz-File-Name"].([]string)[0]
+				fmt.Printf("Part %d of %s\n", i, name)
+
+				r := bytes.NewReader(rsp["body"].([]byte))
+				b, er := ioutil.ReadAll(r)
+				if er != nil {
+					return er
+				}
+
+				lclPath = filepath.Join(localFilePath, name)
+				if i == 0 {
+					file, err2 = os.OpenFile(lclPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+					if err2 != nil {
+						fmt.Println(err2)
+						os.Exit(1)
+					}
+				}
+				n, err := file.Write(b)
+				if err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+				written += n
+			}
+		}
+
+		file.Close()
+		fmt.Printf("wrote out %d original size: %d\n", written, r.ContentLength)
+		// Validate file by sha1
+		f := filenative.NewFile(lclPath)
+		// Create sha1 hash and encode it
+		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
+		// Compare hash to original
+		if sha1hash != sha1Val {
+			return fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
+		}
+	}
+
+	return nil
+}
+
 func DownloadFileById() error {
 
 	c := setupCloud()
 	localFilePath := "."
-	rsp, err := c.DownloadByID("1234567890")
+	rsp, err := c.DownloadByID("1234567890", "")
 	if err != nil {
 		return err
 	}
@@ -276,7 +378,7 @@ func DeleteFile() error {
 func DeleteAllFileVersions() error {
 	c := setupCloud()
 
-	files, err := c.ListFileVersions("1234567890", "myfile.txt")
+	files, err := c.ListFileVersions(bucketID, "myfile.txt")
 	if err != nil {
 		return err
 	}
@@ -296,7 +398,7 @@ func DeleteAllFileVersions() error {
 func HideFile() error {
 	c := setupCloud()
 
-	r, err := c.HideFile("1234567890", "myfile.txt")
+	r, err := c.HideFile(bucketID, "myfile.txt")
 	if err != nil {
 		return err
 	}
@@ -308,12 +410,12 @@ func HideFile() error {
 func GetFileInfo() error {
 	c := setupCloud()
 
-	r, err := c.GetFileInfo("fileID")
+	r, err := c.GetFileInfo(fileID)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("FileInfo: %s - %s", r.FileName, r.FileID)
+	fmt.Printf("FileInfo: %s - %s SIZE: %d\n", r.FileName, r.FileID, r.ContentLength)
 
 	return nil
 }
@@ -321,7 +423,7 @@ func GetFileInfo() error {
 func ListUnfinishedParts() error {
 	c := setupCloud()
 
-	r, err := c.ListUnfinishedLargeFiles("1234567890")
+	r, err := c.ListUnfinishedLargeFiles(bucketID)
 	if err != nil {
 		return err
 	}
@@ -351,7 +453,7 @@ func ListBucketSize() error {
 	c := setupCloud()
 
 	var bucketSize int64
-	r, err := c.ListFileVersions("1234567890", "")
+	r, err := c.ListFileVersions(bucketID, "")
 	if err != nil {
 		return err
 	}
