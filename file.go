@@ -48,7 +48,7 @@ const (
 	MinParts = 2
 	// MaxUploadTB size in TB
 	MaxUploadTB = 10
-	maxParts    = 10000
+	maxParts    = 100
 )
 
 var (
@@ -90,15 +90,11 @@ func (c *Cloud) SendParts(up *Upload) bool {
 		defer fo.Close()
 		for _, d := range parts {
 			d := d
-			//Create a buffer of the partial size to load with data
-			partBuffer := make([]byte, d.Size)
-			//Read data into byte array
-			fo.ReadAt(partBuffer, d.Start)
 
 			//Create Task, send to worker
 			task := concur.NewTask(
 				func() (error, []byte) {
-					et := c.worker(up, d, partBuffer)
+					et := c.worker(up, d, fo)
 					return nil, []byte(et)
 				},
 				NewRtnd(up))
@@ -127,7 +123,7 @@ func (c *Cloud) SendParts(up *Upload) bool {
 	return false
 }
 
-func (c *Cloud) worker(up *Upload, p *UploaderPart, data []byte) string {
+func (c *Cloud) worker(up *Upload, p *UploaderPart, fo *os.File) string {
 
 	fupr, err := c.GetUploadPartURL(up.FileID)
 	if err != nil {
@@ -138,7 +134,7 @@ func (c *Cloud) worker(up *Upload, p *UploaderPart, data []byte) string {
 	//Not sent yet, send now
 	if len(p.Etag) <= 0 {
 		//Convert to load via START/STOP instead of actual file part
-		resp, err := UploadPart(fupr, up, p, data, meta)
+		resp, err := UploadPart(fupr, up, p, fo, meta)
 		if err != nil {
 			log.Logf(log.ERROR, "%+v", err)
 			return ""
@@ -152,7 +148,7 @@ func (c *Cloud) worker(up *Upload, p *UploaderPart, data []byte) string {
 	return "^" + strconv.FormatUint(p.PartID, 10)
 }
 
-func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPart, data []byte, meta file.Meta) (*b2api.UploadPartResponse, error) {
+func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPart, fo *os.File, meta file.Meta) (*b2api.UploadPartResponse, error) {
 
 	partID := int(p.PartID)
 	size := int64(p.Size)
@@ -162,11 +158,16 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 	header["X-Bz-Part-Number"] = strconv.Itoa(partID)
 	header["Content-Length"] = mathut.FmtInt(int(size))
 
-	sha1hash := encode.Encode(sha1.NewHash(sha1.Format(hashenum.SHA1)).String(string(data)), encodeenum.Hex)
+	//Create a buffer of the partial size to load with data
+	partBuffer := make([]byte, p.Size)
+	//Read data into byte array
+	fo.ReadAt(partBuffer, p.Start)
+
+	sha1hash := encode.Encode(sha1.NewHash(sha1.Format(hashenum.SHA1)).String(string(partBuffer)), encodeenum.Hex)
 	header["X-Bz-Content-Sha1"] = sha1hash
 	header["X-Bz-Info-src_last_modified_millis"] = mathut.FmtInt(int(meta.LastMod()))
 
-	r := ioutil.NopCloser(bytes.NewReader(data))
+	r := ioutil.NopCloser(bytes.NewReader(partBuffer))
 	log.Logln(log.DEBUG, "Uploading: ", partID, " Size: ", size)
 	rc := passthrough.NewStream(r, size, up.File.Name(), int(partID), 5)
 
@@ -1163,10 +1164,10 @@ func (u *Upload) SetupPartSizes(fileID string) {
 	u.Parts = make([]*UploaderPart, u.TotalPartsCount)
 
 	//Open file to read and determine start/end of each part
-	fo, err := os.Open(u.File.Path())
-	bserr.Err(err, "err opening file")
-
-	defer fo.Close()
+	//fo, err := os.Open(u.File.Path())
+	//bserr.Err(err, "err opening file")
+	//
+	//defer fo.Close()
 
 	var lastsize, start, end int64
 
