@@ -1347,10 +1347,10 @@ func (r *Rtnd) Response(b []byte) {
 	r.upload.UpdateEtag(id, r.upload.AppName, r.etag)
 }
 
-func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) error {
+func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) (string, error) {
 	r, err := c.GetFileInfo(fileID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fmt.Println(r.ContentLength)
 	var size int64 = 0 //301040503
@@ -1399,7 +1399,6 @@ func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) error {
 		}
 		file.Truncate(r.ContentLength)
 
-
 		var tasks []*concur.Task
 		for _, d := range parts {
 			d := d
@@ -1424,13 +1423,14 @@ func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) error {
 		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
 		// Compare hash to original
 		if sha1hash != sha1Val {
-			return fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
+			return "", fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
 		}
+		return lclPath, nil
 	} else {
 		// download as a single file SEE DownloadFileById
 		rsp, err := c.DownloadByID(fileID, "")
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		if rsp != nil {
@@ -1438,13 +1438,13 @@ func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) error {
 			r := bytes.NewReader(rsp["body"].([]byte))
 			b, er := ioutil.ReadAll(r)
 			if er != nil {
-				return er
+				return "", er
 			}
 
 			lclPath := filepath.Join(localFilePath, name)
 			i, er := iout.WriteOut(b, lclPath)
 			if er != nil {
-				return er
+				return "", er
 			}
 			log.Logf(log.DEBUG, "wrote out %d", i)
 
@@ -1454,12 +1454,13 @@ func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) error {
 			sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
 			// Compare hash to original
 			if sha1hash != sha1Val {
-				return fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
+				return "", fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
 			}
+			return lclPath, nil
 		}
 	}
 
-	return nil
+	return "", nil
 }
 func workerDown(c *Cloud, p *UploaderPart, file *os.File, fileID string) {
 	rsp, err := c.DownloadByID(fileID, "bytes="+mathut.FmtInt(int(p.Start))+"-"+mathut.FmtInt(int(p.End)))
