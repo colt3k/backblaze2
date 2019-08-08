@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,9 +27,11 @@ import (
 	"github.com/colt3k/utils/file/filesize"
 	"github.com/colt3k/utils/hash/hashenum"
 	"github.com/colt3k/utils/hash/sha1"
+	iout "github.com/colt3k/utils/io"
 	"github.com/colt3k/utils/io/ioreader/passthrough"
 	"github.com/colt3k/utils/io/iowriter"
 	"github.com/colt3k/utils/mathut"
+	"github.com/colt3k/utils/stringut"
 
 	"github.com/colt3k/backblaze2/b2api"
 	"github.com/colt3k/backblaze2/errs"
@@ -50,6 +53,7 @@ const (
 	// MaxUploadTB size in TB
 	MaxUploadTB = 10
 	maxParts    = 100
+	DownSplitThresh = 200000000
 )
 
 var (
@@ -1329,6 +1333,9 @@ func NewRtnd(up *Upload) *Rtnd {
 
 // Response set response
 func (r *Rtnd) Response(b []byte) {
+	if b == nil {
+		return
+	}
 	//receives etag+^+partid
 	ar := strings.Split(string(b), "^")
 	r.etag = ar[0]
@@ -1339,3 +1346,135 @@ func (r *Rtnd) Response(b []byte) {
 
 	r.upload.UpdateEtag(id, r.upload.AppName, r.etag)
 }
+
+func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) error {
+	r, err := c.GetFileInfo(fileID)
+	if err != nil {
+		return err
+	}
+	fmt.Println(r.ContentLength)
+	var size int64 = 0 //301040503
+	size = r.ContentLength
+	name := r.FileName
+	sha1Val := r.ContentSha1
+
+	// If over 200MB multipart download
+	totalPartsCount := uint64(math.Ceil(float64(size) / float64(DownloadFileChunk)))
+
+	if size > DownSplitThresh {
+
+		lclPath := filepath.Join(localFilePath, name)
+		fmt.Printf("file over %s, total parts to download %d\n", stringut.HRByteCount(DownSplitThresh, true), totalPartsCount)
+		parts := make([]*UploaderPart, totalPartsCount)
+		var lastsize, start, end int64
+
+		for i := uint64(0); i < totalPartsCount; i++ {
+			// file size - this chunk is the size of the part
+			partSize := int64(math.Min(DownloadFileChunk, float64(size-int64(i*DownloadFileChunk))))
+
+			//first time through set to partSize
+			if lastsize == 0 {
+				lastsize = partSize	//10485760
+			}
+
+			// start is equal to the loop id multiplied by lastsize
+			start = int64(i) * lastsize
+			if start == 0 {
+				end = lastsize -1
+			} else {
+				end = start + lastsize -1
+			}
+			if i == totalPartsCount-1 {
+				end = start + partSize
+			}
+			parts[i] = NewUploaderPart(i+1, start, end, partSize)
+			//fmt.Printf("part %d: full size: %d start %d end %d\n", i, size, start, end)
+		}
+		fmt.Printf("Downloading in %d parts", totalPartsCount)
+
+		file, err2 := os.OpenFile(lclPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err2 != nil {
+			fmt.Println(err2)
+			os.Exit(1)
+		}
+		file.Truncate(r.ContentLength)
+
+
+		var tasks []*concur.Task
+		for _, d := range parts {
+			d := d
+			//Create Task, send to worker
+			task := concur.NewTask(
+				func() (error, []byte) {
+					workerDown(c, d, file, r.FileID)
+					return nil, []byte(nil)
+				},
+				NewRtnd(nil))
+
+			tasks = append(tasks, task)
+		}
+		p := concur.NewPool(tasks, 3)
+		p.Run()
+
+		file.Close()
+
+		// Validate file by sha1
+		f := filenative.NewFile(lclPath)
+		// Create sha1 hash and encode it
+		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
+		// Compare hash to original
+		if sha1hash != sha1Val {
+			return fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
+		}
+	} else {
+		// download as a single file SEE DownloadFileById
+		rsp, err := c.DownloadByID(fileID, "")
+		if err != nil {
+			return err
+		}
+
+		if rsp != nil {
+			// Read file data
+			r := bytes.NewReader(rsp["body"].([]byte))
+			b, er := ioutil.ReadAll(r)
+			if er != nil {
+				return er
+			}
+
+			lclPath := filepath.Join(localFilePath, name)
+			i, er := iout.WriteOut(b, lclPath)
+			if er != nil {
+				return er
+			}
+			log.Logf(log.DEBUG, "wrote out %d", i)
+
+			// Validate file by sha1
+			f := filenative.NewFile(lclPath)
+			// Create sha1 hash and encode it
+			sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
+			// Compare hash to original
+			if sha1hash != sha1Val {
+				return fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
+			}
+		}
+	}
+
+	return nil
+}
+func workerDown(c *Cloud, p *UploaderPart, file *os.File, fileID string) {
+	rsp, err := c.DownloadByID(fileID, "bytes="+mathut.FmtInt(int(p.Start))+"-"+mathut.FmtInt(int(p.End)))
+	bserr.StopErr(err, "err downloading by id")
+
+	if rsp != nil {
+		r := bytes.NewReader(rsp["body"].([]byte))
+		b, er := ioutil.ReadAll(r)
+		bserr.StopErr(er, "err reading body")
+
+		n, err := file.WriteAt(b, p.Start)
+		if err != nil {
+			bserr.StopErr(err, "issue writing at")
+		}
+		fmt.Printf("Part %d wrote out %d\n", p.PartID, n)
+	}
+}
+

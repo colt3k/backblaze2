@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"math"
 	"os"
 	"path/filepath"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/colt3k/utils/hash/hashenum"
 	"github.com/colt3k/utils/hash/sha1"
 	iout "github.com/colt3k/utils/io"
-	"github.com/colt3k/utils/mathut"
 
 	"github.com/colt3k/backblaze2"
 	"github.com/colt3k/backblaze2/b2api"
@@ -24,10 +22,11 @@ import (
 var (
 	ACCT_ID = os.Getenv("ACCT_ID")
 	APP_ID  = os.Getenv("APP_ID")
-	bucketName = "ctcloudsync"
-	bucketID = "f5e8ff6218490eb66093001f"
-	filePath   = "/Users/gcollins/Downloads/MINE/gparted-live-0.33.0-1-i686.iso"
-	fileID = "4_zf5e8ff6218490eb66093001f_f2051b8c8ba09564c_d20190807_m194535_c001_v0001116_t0025"
+	bucketName = ""
+	bucketID = ""
+	filePath   = ""
+	fileID = ""
+	fileName = ""
 )
 
 func main() {
@@ -35,7 +34,7 @@ func main() {
 		fmt.Println("ACCT_ID and/or APP_ID not defined")
 		os.Exit(-1)
 	}
-	er := DownloadFileByID2()
+	er := ListFileVersions()
 	if er != nil {
 		fmt.Printf("%v", er)
 	}
@@ -128,7 +127,7 @@ func DeleteBucket() error {
 func CreateVirtualFile() error {
 	c := setupCloud()
 
-	r, err := c.UploadVirtualFile(bucketID, "myfile.txt", []byte("test content"), 0)
+	r, err := c.UploadVirtualFile(bucketID, fileName, []byte("test content"), 0)
 	if err != nil {
 		return err
 	}
@@ -141,7 +140,7 @@ func CreateVirtualFile() error {
 func ListFileVersions() error {
 	c := setupCloud()
 
-	r, err := c.ListFileVersions(bucketID, "myfile.txt")
+	r, err := c.ListFileVersions(bucketID, fileName)
 	if err != nil {
 		return err
 	}
@@ -185,11 +184,11 @@ func UploadFile() error {
 	return nil
 }
 
-func DownloadFile() error {
+func DownloadFileByNameLatestOnly() error {
 	c := setupCloud()
 
 	localFilePath := "."
-	rsp, err := c.DownloadByName(bucketName, "myfile.txt")
+	rsp, err := c.DownloadByName(bucketName, fileName)
 	if err != nil {
 		return err
 	}
@@ -226,137 +225,12 @@ func DownloadFile() error {
 	return nil
 }
 
-func DownloadFileByID2() error {
-	var size int64 = 0 //301040503
-	c := setupCloud()
-	localFilePath := "/Users/gcollins/Desktop"
-	r, err := c.GetFileInfo(fileID)
-	if err != nil {
-		return err
-	}
-	fmt.Println(r.ContentLength)
-	size = r.ContentLength
-	// If over 200MB multipart download
-
-	totalPartsCount := uint64(math.Ceil(float64(size) / float64(backblaze2.DownloadFileChunk)))
-
-	if size > 200000000 {
-		sha1Val := ""
-		lclPath := ""
-		fmt.Println("file over 200MB, total parts to download", totalPartsCount)
-		parts := make([]*backblaze2.UploaderPart, totalPartsCount)
-		var lastsize, start, end int64
-
-		for i := uint64(0); i < totalPartsCount; i++ {
-			// file size - this chunk is the size of the part
-			partSize := int64(math.Min(backblaze2.DownloadFileChunk, float64(size-int64(i*backblaze2.DownloadFileChunk))))
-
-			//first time through set to partSize
-			if lastsize == 0 {
-				lastsize = partSize	//10485760
-			}
-
-			// start is equal to the loop id multiplied by lastsize
-			start = int64(i) * lastsize
-			if start == 0 {
-				end = lastsize -1
-			} else {
-				end = start + lastsize -1
-			}
-			if i == totalPartsCount-1 {
-				end = start + partSize
-			}
-			parts[i] = backblaze2.NewUploaderPart(i+1, start, end, partSize)
-			fmt.Printf("part %d: full size: %d start %d end %d\n", i, size, start, end)
-		}
-
-		var file *os.File
-		var err2 error
-		var written int
-		for i,j := range parts {
-
-			rsp, err := c.DownloadByID(r.FileID, "bytes="+mathut.FmtInt(int(j.Start))+"-"+mathut.FmtInt(int(j.End)))
-			if err != nil {
-				return err
-			}
-			if rsp != nil {
-				sha1Val = rsp["X-Bz-Info-Large_file_sha1"].([]string)[0]
-				name := rsp["X-Bz-File-Name"].([]string)[0]
-				fmt.Printf("Part %d of %s\n", i, name)
-
-				r := bytes.NewReader(rsp["body"].([]byte))
-				b, er := ioutil.ReadAll(r)
-				if er != nil {
-					return er
-				}
-
-				lclPath = filepath.Join(localFilePath, name)
-				if i == 0 {
-					file, err2 = os.OpenFile(lclPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-					if err2 != nil {
-						fmt.Println(err2)
-						os.Exit(1)
-					}
-				}
-				n, err := file.Write(b)
-				if err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
-				written += n
-			}
-		}
-
-		file.Close()
-		fmt.Printf("wrote out %d original size: %d\n", written, r.ContentLength)
-		// Validate file by sha1
-		f := filenative.NewFile(lclPath)
-		// Create sha1 hash and encode it
-		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
-		// Compare hash to original
-		if sha1hash != sha1Val {
-			return fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
-		}
-	}
-
-	return nil
-}
-
-func DownloadFileById() error {
-
-	c := setupCloud()
+func DownloadFileByID() error {
 	localFilePath := "."
-	rsp, err := c.DownloadByID("1234567890", "")
+	c := setupCloud()
+	err := c.MultipartDownloadById(fileID, localFilePath)
 	if err != nil {
 		return err
-	}
-
-	if rsp != nil {
-		name := rsp["X-Bz-File-Name"].([]string)[0]
-		sha1Val := rsp["X-Bz-Info-Large_file_sha1"].([]string)[0]
-
-		// Read file data
-		r := bytes.NewReader(rsp["body"].([]byte))
-		b, er := ioutil.ReadAll(r)
-		if er != nil {
-			return er
-		}
-
-		lclPath := filepath.Join(localFilePath, name)
-		i, er := iout.WriteOut(b, lclPath)
-		if er != nil {
-			return er
-		}
-		log.Logf(log.DEBUG, "wrote out %d", i)
-
-		// Validate file by sha1
-		f := filenative.NewFile(lclPath)
-		// Create sha1 hash and encode it
-		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
-		// Compare hash to original
-		if sha1hash != sha1Val {
-			return fmt.Errorf("downloaded file doesn't match remote by sha1 %s local %s", sha1Val, sha1hash)
-		}
 	}
 
 	return nil
@@ -365,7 +239,7 @@ func DownloadFileById() error {
 func DeleteFile() error {
 	c := setupCloud()
 
-	r, err := c.DeleteFile("filename", "fileID")
+	r, err := c.DeleteFile(fileName, fileID)
 	if err != nil {
 		return err
 	}
@@ -378,7 +252,7 @@ func DeleteFile() error {
 func DeleteAllFileVersions() error {
 	c := setupCloud()
 
-	files, err := c.ListFileVersions(bucketID, "myfile.txt")
+	files, err := c.ListFileVersions(bucketID, fileName)
 	if err != nil {
 		return err
 	}
@@ -398,7 +272,7 @@ func DeleteAllFileVersions() error {
 func HideFile() error {
 	c := setupCloud()
 
-	r, err := c.HideFile(bucketID, "myfile.txt")
+	r, err := c.HideFile(bucketID, fileName)
 	if err != nil {
 		return err
 	}
@@ -432,14 +306,13 @@ func ListUnfinishedParts() error {
 		fmt.Printf("%d Part: %s %d %d - %s", i, k.FileName, k.ContentLength, k.UploadTimestamp, k.FileID)
 	}
 
-
 	return nil
 }
 
 func CancelUnfinishedLargeUpload() error {
 	c := setupCloud()
 
-	r, err := c.CancelLargeFile("fileID")
+	r, err := c.CancelLargeFile(fileID)
 	if err != nil {
 		return err
 	}
