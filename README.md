@@ -2,12 +2,6 @@
 
 map to api provided by back blaze b2 cloud
 
-## TODO
-
-Downloads over 200MB should be split into parts and downloaded simultaneously. Once all parts are downloaded, the large file should be stitched together.
-    Use the Range header on b2_download_file_by_id or b2_download_file_by_name to download individual parts of a file.
-    
-
 ## Testing failures on upload
 
 X-Bz-Test-Mode: fail_some_uploads
