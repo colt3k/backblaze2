@@ -348,9 +348,39 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 		r := ioutil.NopCloser(rdr)
 		log.Logln(log.DEBUG, "Uploading  Size: ", sz)
 		rc := passthrough.NewStream(r, int64(sz), fname, 1, 1)
-
 		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
 		if er != nil {
+			if rc != nil {
+				rc.Close()
+			}
+			if r != nil {
+				r.Close()
+			}
+			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
+				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
+					log.Printf("%s: trying again", er.Code())
+				}
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Println("service unavailable trying again, please stand by")
+						sleep := 7*time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.UploadVirtualFile(bucketId, fname, data, lastMod)
+				}
+			}
 			return nil, er
 		}
 		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
