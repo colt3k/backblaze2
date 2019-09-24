@@ -174,7 +174,7 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 
 	r := ioutil.NopCloser(bytes.NewReader(partBuffer))
 	log.Logln(log.DEBUG, "Uploading: ", partID, " Size: ", size)
-	rc := passthrough.NewStream(r, size, up.File.Name(), int(partID), 5)
+	rc := passthrough.NewStream(r, size, up.File.Name(), int(partID), int(up.TotalPartsCount), 5)
 
 	mapData, err := caller.MakeCall("POST", fupr.UploadURL, rc, header)
 	if err != nil {
@@ -302,7 +302,7 @@ func (c *Cloud) UploadFile(bucketId, filePath string) (*b2api.UploadResp, errs.E
 		rdr := bytes.NewReader(data)
 		r := ioutil.NopCloser(rdr)
 		log.Logln(log.DEBUG, "Uploading  Size: ", f.Size())
-		rc := passthrough.NewStream(r, f.Size(), f.Name(), 1, 1)
+		rc := passthrough.NewStream(r, f.Size(), f.Name(), 1, 1, 1)
 
 		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
 		if er != nil {
@@ -347,7 +347,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 		rdr := bytes.NewReader(data)
 		r := ioutil.NopCloser(rdr)
 		log.Logln(log.DEBUG, "Uploading  Size: ", sz)
-		rc := passthrough.NewStream(r, int64(sz), fname, 1, 1)
+		rc := passthrough.NewStream(r, int64(sz), fname, 1, 1, 1)
 		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
 		if er != nil {
 			if rc != nil {
