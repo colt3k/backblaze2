@@ -17,8 +17,8 @@ github.com/colt3k/utils/hash v0.0.3 h1:DA6+/48PkVYiEt/Qp//ie8WEcdEAVhdyHW8748inw
 github.com/colt3k/utils/hash v0.0.3/go.mod h1:tW78n3Qn3VcfynRBcDjq+z5X2WegrYX5BQhbhSdQxWc=
 github.com/colt3k/utils/io v0.0.1 h1:8L1GYrj4P+GzgGHvWAeRuZXCVs9TShbuu2tQNTdsIgg=
 github.com/colt3k/utils/io v0.0.1/go.mod h1:nfGwnh4JYZGt7Xhb6HllVOXOysYU9Xd9tlW+jkgtUt0=
-github.com/colt3k/utils/io v0.0.9 h1:/FJgl0Hr1MrYNWc8gM60JDPUgIE2VTnpltJ6f0HZyr4=
-github.com/colt3k/utils/io v0.0.9/go.mod h1:ftYiH5W2k70UoazVkmtxQAVAfJe7aJq8mnl9+AB48/Y=
+github.com/colt3k/utils/io v0.0.10 h1:PCQ5xs6rkrOFzn6jWSDgdpAbushDDyRw7HFI2oJ0evE=
+github.com/colt3k/utils/io v0.0.10/go.mod h1:kN2O1zdVzYCTPapzBg+yg5HJdQxUKy8MxUu14wYs9Cc=
 github.com/colt3k/utils/mathut v0.0.1 h1:o/aIDspFY3PPdP1L1Xn/TSBp0V2m0o7X7MPxmCzeYtI=
 github.com/colt3k/utils/mathut v0.0.1/go.mod h1:YK4vx6fJOhaIJ3idYVcILYl99CNpLol7mlG+K+PnJNw=
 github.com/colt3k/utils/netut v0.0.1 h1:KEgxUX5rY+v2gNaXBTnmeyO94VNo0ZSsSbjMojS2870=

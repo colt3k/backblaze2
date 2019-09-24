@@ -6,7 +6,7 @@ require (
 	github.com/colt3k/utils/encode v0.0.2
 	github.com/colt3k/utils/file v0.0.2
 	github.com/colt3k/utils/hash v0.0.3
-	github.com/colt3k/utils/io v0.0.9
+	github.com/colt3k/utils/io v0.0.10
 	github.com/colt3k/utils/mathut v0.0.1
 	github.com/colt3k/utils/netut v0.0.1
 	github.com/colt3k/utils/osut v0.0.1
