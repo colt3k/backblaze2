@@ -51,8 +51,8 @@ const (
 	// MinParts count size
 	MinParts = 2
 	// MaxUploadTB size in TB
-	MaxUploadTB = 10
-	maxParts    = 100
+	MaxUploadTB     = 10
+	maxParts        = 100
 	DownSplitThresh = 200000000
 )
 
@@ -223,14 +223,14 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -256,7 +256,7 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 // UploadFile file name and info must fit in 7k byte limit,
 // 	the file to be uploaded is the message body and is not encoded in any way.
 //		it's not URL encoded, it's not MIME encoded
-func (c *Cloud) UploadFile(bucketId, filePath string) (*b2api.UploadResp, errs.Error) {
+func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs.Error) {
 
 	if perms.UploadFile(c.AuthResponse) {
 		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
@@ -270,8 +270,12 @@ func (c *Cloud) UploadFile(bucketId, filePath string) (*b2api.UploadResp, errs.E
 		//	- Retrieve file size
 		//	- Retrieve SHA-1
 		//	- Retrieve Last Modified in millis
-		f := filenative.NewFile(filePath)
-		name := url.URL{Path: f.Name()}
+		f := filenative.NewFile(up.Filepath)
+		fullPathName := f.Name()
+		if len(up.OverridePath) > 0 {
+			fullPathName = up.OverridePath
+		}
+		name := url.URL{Path: fullPathName}
 
 		meta := filemeta.New(f)
 		// create sha1 hash and encode it
@@ -339,7 +343,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 		// https://www.backblaze.com/b2/docs/content-types.html
 		header["Content-Length"] = mathut.FmtInt(sz) // number of bytes in the file being uploaded +40 for SHA1
 		// When sending the SHA1 checksum at the end, the Content-Length should be set to the size of the file plus the 40 bytes of hex checksum.
-		header["X-Bz-Content-Sha1"] = sha1hash                                            // SHA1 checksum of the content of the file. B2 will check this when the file is uploaded, to make sure that the file arrived correctly
+		header["X-Bz-Content-Sha1"] = sha1hash                                     // SHA1 checksum of the content of the file. B2 will check this when the file is uploaded, to make sure that the file arrived correctly
 		header["X-Bz-Info-src_last_modified_millis"] = mathut.FmtInt(int(lastMod)) // SHA1 checksum of the content of the file. B2 will check this when the file is uploaded, to make sure that the file arrived correctly
 		//header["X-Bz-Info-b2-content-disposition"] = ""   // value must match the grammar specified in RFC 6266
 		//header["X-Bz-Info-*"] = ""	// up to 10 of these replacing * with the value must be a percent encoded UTF8 string
@@ -364,14 +368,14 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -418,14 +422,14 @@ func (c *Cloud) ListFiles(bucketId, filename string) (*b2api.ListFilesResponse, 
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -473,14 +477,14 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -524,14 +528,14 @@ func (c *Cloud) DeleteFile(fileName, fileID string) (*b2api.DeleteFileVersionRes
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -575,14 +579,14 @@ func (c *Cloud) HideFile(bucketId, fileName string) (*b2api.HideFileResponse, er
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -625,14 +629,14 @@ func (c *Cloud) GetFileInfo(fileID string) (*b2api.GetFileInfoResponse, errs.Err
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -684,14 +688,14 @@ func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationIn
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -734,7 +738,7 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 
 		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
-		url := c.AuthResponse.DownloadURL + "/file/" + bucketName + "/" + fileName+"?Authorization="+c.AuthResponse.AuthorizationToken+"&b2-content-disposition=large_file_sha1"
+		url := c.AuthResponse.DownloadURL + "/file/" + bucketName + "/" + fileName + "?Authorization=" + c.AuthResponse.AuthorizationToken + "&b2-content-disposition=large_file_sha1"
 		mapData, er := caller.MakeCall("GET", url, nil, header)
 		if er != nil {
 			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
@@ -745,14 +749,14 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -791,7 +795,7 @@ func (c *Cloud) DownloadByID(fileID, byteRange string) (map[string]interface{}, 
 
 		url := c.AuthResponse.DownloadURL + uri.B2DownloadFileById + "?fileId=" + fileID
 		if len(byteRange) > 0 {
-			header["Range"] =byteRange
+			header["Range"] = byteRange
 		}
 		mapData, er := caller.MakeCall("GET", url, nil, header)
 		if er != nil {
@@ -804,22 +808,26 @@ func (c *Cloud) DownloadByID(fileID, byteRange string) (map[string]interface{}, 
 }
 
 // StartLargeFile create initial start call
-func (c *Cloud) StartLargeFile(bucketID, fileInfo string, f file.File) (*b2api.StartLargeFileResponse, errs.Error) {
+func (c *Cloud) StartLargeFile(bucketID, fileInfo string, up *Upload) (*b2api.StartLargeFileResponse, errs.Error) {
 
 	if perms.StartLargeFile(c.AuthResponse) {
 		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		// build sha1 and include as file info 'large_file_sha1'
 		// create sha1 hash and encode it
-		sha1hash := encode.Encode(f.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
+		sha1hash := encode.Encode(up.File.Hash(sha1.NewHash(sha1.Format(hashenum.SHA1)), true), encodeenum.Hex)
 
-		fm := filemeta.New(f)
+		fm := filemeta.New(up.File)
 
+		fullFilePath := up.File.Name()
+		if len(up.OverridePath) > 0 {
+			fullFilePath = up.OverridePath
+		}
 		req := &b2api.StartLargeFileReq{
 			BucketId:    bucketID,
-			FileName:    f.Name(),
+			FileName:    fullFilePath,
 			ContentType: "b2/x-auto",
-			FileInfo:    b2api.FileInfo{SrcLastModifiedMillis: mathut.FmtInt(int(fm.LastMod())), LargeFileSha1:sha1hash},
+			FileInfo:    b2api.FileInfo{SrcLastModifiedMillis: mathut.FmtInt(int(fm.LastMod())), LargeFileSha1: sha1hash},
 		}
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2StartLargeFile, req, header)
@@ -832,21 +840,21 @@ func (c *Cloud) StartLargeFile(bucketID, fileInfo string, f file.File) (*b2api.S
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					c.AuthConfig.Clear = true
 					c.AuthAccount()
-					return c.StartLargeFile(bucketID, fileInfo, f)
+					return c.StartLargeFile(bucketID, fileInfo, up)
 				}
 			}
 			return nil, er
@@ -881,14 +889,14 @@ func (c *Cloud) GetUploadPartURL(fileID string) (*b2api.GetFileUploadPartRespons
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -932,14 +940,14 @@ func (c *Cloud) ListPartsURL(fileID string, startPartNo, maxPartCount int64) (*b
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -985,14 +993,14 @@ func (c *Cloud) ListUnfinishedLargeFiles(bucketID string) (*b2api.ListUnfinished
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -1034,14 +1042,14 @@ func (c *Cloud) FinishLargeFileUpload(fileId string, sha1Array []string) (*b2api
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -1084,14 +1092,14 @@ func (c *Cloud) CancelLargeFile(fileId string) (*b2api.CanxUpLgFileResp, errs.Er
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
 						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -1129,6 +1137,7 @@ type Upload struct {
 	AppName         string          `json:"-"`
 	Bucket          string          `json:"bucket"`
 	Filepath        string          `json:"filepath"`
+	OverridePath    string          `json:"override_path"`
 	UploadID        string          `json:"uploadid"`
 	File            file.File       `json:"-"`
 	FileID          string          `json:"fileId"`
@@ -1138,10 +1147,11 @@ type Upload struct {
 }
 
 // New create upload object
-func NewUploader(bucketName, filepath string) *Upload {
+func NewUploader(bucketName, filepath, overridepath string) *Upload {
 	t := new(Upload)
 	t.Bucket = bucketName
 	t.Filepath = filepath
+	t.OverridePath = overridepath
 	t.File = filenative.NewFile(t.Filepath)
 	t.AppName = AppFolderName
 	return t
@@ -1253,7 +1263,7 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 	// Find bucketId by name
 	bkts, err := c.ListBuckets("", u.Bucket, nil)
 	if err != nil {
-		return "",err
+		return "", err
 	}
 	if len(bkts.Buckets) <= 0 {
 		return "", fmt.Errorf("no buckets found")
@@ -1268,7 +1278,7 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 		}
 
 		// Trigger Multipart with a Start
-		strtLgFileResp, err := c.StartLargeFile(bucket.BucketID, "", u.File)
+		strtLgFileResp, err := c.StartLargeFile(bucket.BucketID, "", u)
 		if err != nil {
 			return "", err
 		}
@@ -1292,12 +1302,12 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 
 	} else if !u.ValidateOverMinPartSize() {
 
-		rsp, err := c.UploadFile(bucket.BucketID, u.Filepath)
+		rsp, err := c.UploadFile(bucket.BucketID, u)
 		if err != nil {
 			return "", err
 		}
 		if rsp != nil {
-			log.Logf(log.INFO,"Uploaded fileID: ", rsp.FileID)
+			log.Logf(log.INFO, "Uploaded fileID: ", rsp.FileID)
 			return rsp.FileID, nil
 		}
 
@@ -1305,7 +1315,7 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 		return "", fmt.Errorf("file too large for upload, over %d TB", MaxUploadTB)
 	}
 
-	return "",nil
+	return "", nil
 }
 
 // UpdateEtag update each etag
@@ -1350,9 +1360,9 @@ func (u *Upload) Completed() bool {
 
 // Rtnd returned struct
 type Rtnd struct {
-	etag    string
-	upload  *Upload
-	mu      sync.Mutex
+	etag   string
+	upload *Upload
+	mu     sync.Mutex
 }
 
 // NewRtnd create new Rtnd struct
@@ -1404,15 +1414,15 @@ func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) (string, err
 
 			//first time through set to partSize
 			if lastsize == 0 {
-				lastsize = partSize	//10485760
+				lastsize = partSize //10485760
 			}
 
 			// start is equal to the loop id multiplied by lastsize
 			start = int64(i) * lastsize
 			if start == 0 {
-				end = lastsize -1
+				end = lastsize - 1
 			} else {
-				end = start + lastsize -1
+				end = start + lastsize - 1
 			}
 			if i == totalPartsCount-1 {
 				end = start + partSize
@@ -1508,4 +1518,3 @@ func workerDown(c *Cloud, p *UploaderPart, file *os.File, fileID string) {
 		fmt.Printf("Part %d wrote out %d\n", p.PartID, n)
 	}
 }
-

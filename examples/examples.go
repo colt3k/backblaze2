@@ -22,7 +22,7 @@ import (
 var (
 	ACCT_ID = os.Getenv("ACCT_ID")
 	APP_ID  = os.Getenv("APP_ID")
-	bucketName = ""
+	bucketName = os.Getenv("BUCKET")
 	bucketID = ""
 	filePath   = ""
 	fileID = ""
@@ -34,7 +34,8 @@ func main() {
 		fmt.Println("ACCT_ID and/or APP_ID not defined")
 		os.Exit(-1)
 	}
-	er := ListFileVersions()
+	//er := ListFileVersions()
+	er := UploadFile()
 	if er != nil {
 		fmt.Printf("%v", er)
 	}
@@ -170,7 +171,7 @@ func ListFiles() error {
 func UploadFile() error {
 	c := setupCloud()
 
-	up := backblaze2.NewUploader(bucketName, filePath)
+	up := backblaze2.NewUploader(bucketName, filePath, "")
 	if up.Available() {
 		fileId, err := up.Process(c)
 		if err != nil {
