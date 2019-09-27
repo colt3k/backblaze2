@@ -229,7 +229,7 @@ func DownloadFileByNameLatestOnly() error {
 func DownloadFileByID() error {
 	localFilePath := "."
 	c := setupCloud()
-	path, err := c.MultipartDownloadById(fileID, localFilePath)
+	path, err := c.MultipartDownloadById(fileID, localFilePath, "")
 	if err != nil {
 		return err
 	}

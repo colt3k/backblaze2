@@ -1387,12 +1387,12 @@ func (r *Rtnd) Response(b []byte) {
 	r.upload.UpdateEtag(id, r.upload.AppName, r.etag)
 }
 
-func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) (string, error) {
+func (c *Cloud) MultipartDownloadById(fileID, localFilePath, fileNameOverride string) (string, error) {
 	r, err := c.GetFileInfo(fileID)
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(r.ContentLength)
+	//fmt.Println(r.ContentLength)
 	var size int64 = 0 //301040503
 	size = r.ContentLength
 	name := r.FileName
@@ -1404,6 +1404,9 @@ func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) (string, err
 	if size > DownSplitThresh {
 
 		lclPath := filepath.Join(localFilePath, name)
+		if len(fileNameOverride) > 0 {
+			lclPath = filepath.Join(localFilePath, fileNameOverride)
+		}
 		fmt.Printf("file over %s, total parts to download %d\n", stringut.HRByteCount(DownSplitThresh, true), totalPartsCount)
 		parts := make([]*UploaderPart, totalPartsCount)
 		var lastsize, start, end int64
@@ -1482,6 +1485,9 @@ func (c *Cloud) MultipartDownloadById(fileID, localFilePath string) (string, err
 			}
 
 			lclPath := filepath.Join(localFilePath, name)
+			if len(fileNameOverride) > 0 {
+				lclPath = filepath.Join(localFilePath, fileNameOverride)
+			}
 			i, er := iout.WriteOut(b, lclPath)
 			if er != nil {
 				return "", er
