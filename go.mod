@@ -12,6 +12,7 @@ require (
 	github.com/colt3k/utils/osut v0.0.1
 	github.com/colt3k/utils/store v0.0.1
 	github.com/colt3k/utils/stringut v0.0.1
+	github.com/colt3k/utils/timeut v0.0.2
 )
 
 go 1.13

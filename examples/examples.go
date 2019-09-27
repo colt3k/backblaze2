@@ -14,6 +14,7 @@ import (
 	"github.com/colt3k/utils/hash/hashenum"
 	"github.com/colt3k/utils/hash/sha1"
 	iout "github.com/colt3k/utils/io"
+	"github.com/colt3k/utils/timeut"
 
 	"github.com/colt3k/backblaze2"
 	"github.com/colt3k/backblaze2/b2api"
@@ -147,7 +148,7 @@ func ListFileVersions() error {
 	}
 
 	for _, k := range r.Files {
-		fmt.Printf("File Version %v : %s - %s\n", k.UploadTimestamp, k.FileName, k.FileID)
+		fmt.Printf("File Version %v : %s - %s\n", timeut.ConverMillis2Time(k.UploadTimestamp), k.FileName, k.FileID)
 	}
 
 	return nil
@@ -162,7 +163,7 @@ func ListFiles() error {
 	}
 
 	for _, k := range r.File {
-		fmt.Printf("File %v : %s - %s\n", k.UploadTimestamp, k.FileName, k.FileID)
+		fmt.Printf("File %v : %s - %s\n", timeut.ConverMillis2Time(k.UploadTimestamp), k.FileName, k.FileID)
 	}
 
 	return nil
@@ -305,7 +306,7 @@ func ListUnfinishedParts() error {
 	}
 
 	for i,k := range r.Files {
-		fmt.Printf("%d Part: %s %d %d - %s", i, k.FileName, k.ContentLength, k.UploadTimestamp, k.FileID)
+		fmt.Printf("%d Part: %s %d %v - %s", i, k.FileName, k.ContentLength, timeut.ConverMillis2Time(k.UploadTimestamp), k.FileID)
 	}
 
 	return nil

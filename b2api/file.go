@@ -98,7 +98,7 @@ type UploadResp struct {
 	FileID          string   `json:"fileId"`
 	FileInfo        FileInfo `json:"fileInfo"`
 	FileName        string   `json:"fileName"`
-	UploadTimestamp int64    `json:"uploadTimestamp"`
+	UploadTimestamp int64    `json:"uploadTimestamp"`	// time in millis
 }
 
 type FileInfo struct {

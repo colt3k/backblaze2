@@ -29,6 +29,8 @@ github.com/colt3k/utils/store v0.0.1 h1:CfomZFxGdtPN3Q8eXf4G2DGGOd9PV/bgPYqoCZo9
 github.com/colt3k/utils/store v0.0.1/go.mod h1:z3hOqSoG2IOZzMusi8whknanPpGbiNJGgaYOvnBfDvI=
 github.com/colt3k/utils/stringut v0.0.1 h1:FvC45guBdUyXY5QcYo9lvVY7kweZoCtJD2TIytQkQk8=
 github.com/colt3k/utils/stringut v0.0.1/go.mod h1:LkfccKIxHAjHsyCNVb/LEENuMUJZ+2+qq8JWjl4qOFE=
+github.com/colt3k/utils/timeut v0.0.2 h1:RLUFqAKA92qfX9M7NAcVzJ6QISkaLQXZhNLr44kWsDE=
+github.com/colt3k/utils/timeut v0.0.2/go.mod h1:tsMdl07Vfflunv6s287uR1DNFzPv6rVLVKev3zWXXSI=
 github.com/gonutz/w32 v1.0.0 h1:3t1z6ZfkFvirjFYBx9pHeHBuKoN/VBVk9yHb/m2Ll/k=
 github.com/gonutz/w32 v1.0.0/go.mod h1:Rc/YP5K9gv0FW4p6X9qL3E7Y56lfMflEol1fLElfMW4=
 github.com/gorilla/context v1.1.1/go.mod h1:kBGZzfjB9CEq2AlWe17Uuf7NDRt0dE0s8S51q0aT7Yg=
@@ -42,6 +44,8 @@ github.com/mattn/go-isatty v0.0.4 h1:bnP0vzxcAdeI1zdubAl5PjU6zsERjGZb7raWodagDYs
 github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/mgutz/str v1.2.0 h1:4IzWSdIz9qPQWLfKZ0rJcV0jcUDpxvP4JVZ4GXQyvSw=
 github.com/mgutz/str v1.2.0/go.mod h1:w1v0ofgLaJdoD0HpQ3fycxKD1WtxpjSo151pK/31q6w=
+github.com/peterhellberg/duration v0.0.0-20180124233644-e84f2822e8a0 h1:MWioEoep2k2UHAo1s6jbOPKcoaEGFALMgQpnYpIToLA=
+github.com/peterhellberg/duration v0.0.0-20180124233644-e84f2822e8a0/go.mod h1:x5xjkH61fUOJVgCCDgqNzlJvdLXiYpmMzSuum2FBOaw=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
