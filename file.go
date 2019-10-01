@@ -1307,7 +1307,6 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 			return "", err
 		}
 		if rsp != nil {
-			log.Logf(log.INFO, "Uploaded fileID: ", rsp.FileID)
 			return rsp.FileID, nil
 		}
 
