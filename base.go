@@ -57,6 +57,7 @@ func (c *Cloud) AuthAccount() {
 		//header["X-Bz-Test-Mode"] = "fail_some_uploads"
 		//header["X-Bz-Test-Mode"] = "force_cap_exceeded"
 		header["X-Bz-Test-Mode"] = val
+		log.Logf(log.INFO, "X-Bz-Test-Mode %s enabled", val)
 	}
 
 	log.Logln(log.DEBUG, "obtaining new token")
