@@ -3,6 +3,7 @@ package backblaze2
 import (
 	"encoding/json"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -51,7 +52,13 @@ func (c *Cloud) AuthAccount() {
 	encAcct := "Basic " + encode.Encode(acct, encodeenum.B64STD)
 	header["Authorization"] = encAcct
 
-	//header["X-Bz-Test-Mode"] = "expire_some_account_authorization_tokens"
+	if val, ok := os.LookupEnv("X-Bz-Test-Mode"); ok {
+		//header["X-Bz-Test-Mode"] = "expire_some_account_authorization_tokens"
+		//header["X-Bz-Test-Mode"] = "fail_some_uploads"
+		//header["X-Bz-Test-Mode"] = "force_cap_exceeded"
+		header["X-Bz-Test-Mode"] = val
+	}
+
 	log.Logln(log.DEBUG, "obtaining new token")
 	mapData, ers := caller.MakeCall("GET", uri.B2AuthAccount, nil, header)
 	if ers != nil {
