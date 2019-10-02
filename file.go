@@ -95,16 +95,17 @@ func (c *Cloud) SendParts(up *Upload) bool {
 		defer fo.Close()
 		for _, d := range parts {
 			d := d
+			if len(d.Etag) <= 0 {
+				//Create Task, send to worker
+				task := concur.NewTask(
+					func() (error, []byte) {
+						et := c.worker(up, d, fo)
+						return nil, []byte(et)
+					},
+					NewRtnd(up))
 
-			//Create Task, send to worker
-			task := concur.NewTask(
-				func() (error, []byte) {
-					et := c.worker(up, d, fo)
-					return nil, []byte(et)
-				},
-				NewRtnd(up))
-
-			tasks = append(tasks, task)
+				tasks = append(tasks, task)
+			}
 		}
 		p := concur.NewPool(tasks, MaxPerSessionUploadPerPart)
 		p.Run()
@@ -122,6 +123,42 @@ func (c *Cloud) SendParts(up *Upload) bool {
 				return false
 			}
 			return true
+		} else {
+			// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
+			log.Println("service issue trying again, please stand by")
+			sleep := 3 * time.Second
+			jitter := time.Duration(rand.Int63n(int64(sleep)))
+			sleep = sleep + jitter/2
+			time.Sleep(sleep)
+			for _, d := range parts {
+				d := d
+				if len(d.Etag) <= 0 {
+					//Create Task, send to worker
+					task := concur.NewTask(
+						func() (error, []byte) {
+							et := c.worker(up, d, fo)
+							return nil, []byte(et)
+						},
+						NewRtnd(up))
+
+					tasks = append(tasks, task)
+				}
+			}
+			p := concur.NewPool(tasks, MaxPerSessionUploadPerPart)
+			p.Run()
+
+			if up.Completed() {
+				//Completed Finish off
+				shas := make([]string, 0)
+				for _, d := range parts {
+					shas = append(shas, d.Etag)
+				}
+				_, err := c.FinishLargeFileUpload(up.FileID, shas)
+				if err != nil {
+					return false
+				}
+				return true
+			}
 		}
 		return false
 	}
@@ -215,10 +252,7 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2GetUploadURL, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -229,7 +263,7 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -311,6 +345,34 @@ func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs
 		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
 		if er != nil {
 			return nil, er
+			if rc != nil {
+				rc.Close()
+			}
+			if r != nil {
+				r.Close()
+			}
+			if testRetryErr(er) {
+				// delete it and call again
+				AuthCounter += 1
+				if AuthCounter <= MaxAuthTry {
+					if AuthCounter > 1 {
+						sleep := 3 * time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					if er.Code() == "service_unavailable" {
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+						sleep := 7 * time.Second
+						jitter := time.Duration(rand.Int63n(int64(sleep)))
+						sleep = sleep + jitter/2
+						time.Sleep(sleep)
+					}
+					c.AuthConfig.Clear = true
+					c.AuthAccount()
+					return c.UploadFile(bucketId, up)
+				}
+			}
 		}
 		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.UploadResp
@@ -360,10 +422,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 			if r != nil {
 				r.Close()
 			}
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -374,7 +433,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -414,10 +473,7 @@ func (c *Cloud) ListFiles(bucketId, filename string) (*b2api.ListFilesResponse, 
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2ListFileNames, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -428,7 +484,7 @@ func (c *Cloud) ListFiles(bucketId, filename string) (*b2api.ListFilesResponse, 
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -469,10 +525,7 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2ListFileVersions, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -483,7 +536,7 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -520,10 +573,7 @@ func (c *Cloud) DeleteFile(fileName, fileID string) (*b2api.DeleteFileVersionRes
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2DeleteFileVersion, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -534,7 +584,7 @@ func (c *Cloud) DeleteFile(fileName, fileID string) (*b2api.DeleteFileVersionRes
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -571,10 +621,7 @@ func (c *Cloud) HideFile(bucketId, fileName string) (*b2api.HideFileResponse, er
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2HideFile, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -585,7 +632,7 @@ func (c *Cloud) HideFile(bucketId, fileName string) (*b2api.HideFileResponse, er
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -621,10 +668,7 @@ func (c *Cloud) GetFileInfo(fileID string) (*b2api.GetFileInfoResponse, errs.Err
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2GetFileInfo, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -635,7 +679,7 @@ func (c *Cloud) GetFileInfo(fileID string) (*b2api.GetFileInfoResponse, errs.Err
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -680,10 +724,7 @@ func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationIn
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2GetDownloadAuth, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -694,7 +735,7 @@ func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationIn
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -741,10 +782,7 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 		url := c.AuthResponse.DownloadURL + "/file/" + bucketName + "/" + fileName + "?Authorization=" + c.AuthResponse.AuthorizationToken + "&b2-content-disposition=large_file_sha1"
 		mapData, er := caller.MakeCall("GET", url, nil, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -755,7 +793,7 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -832,10 +870,7 @@ func (c *Cloud) StartLargeFile(bucketID, fileInfo string, up *Upload) (*b2api.St
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2StartLargeFile, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -846,7 +881,7 @@ func (c *Cloud) StartLargeFile(bucketID, fileInfo string, up *Upload) (*b2api.St
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -881,10 +916,7 @@ func (c *Cloud) GetUploadPartURL(fileID string) (*b2api.GetFileUploadPartRespons
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2GetUploadPartURL, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -895,7 +927,7 @@ func (c *Cloud) GetUploadPartURL(fileID string) (*b2api.GetFileUploadPartRespons
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -932,10 +964,7 @@ func (c *Cloud) ListPartsURL(fileID string, startPartNo, maxPartCount int64) (*b
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2ListParts, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -946,7 +975,7 @@ func (c *Cloud) ListPartsURL(fileID string, startPartNo, maxPartCount int64) (*b
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -985,10 +1014,7 @@ func (c *Cloud) ListUnfinishedLargeFiles(bucketID string) (*b2api.ListUnfinished
 
 		data, er := post(c.AuthResponse.APIURL+uri.B2ListUnfinishedLargeFiles, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -999,7 +1025,7 @@ func (c *Cloud) ListUnfinishedLargeFiles(bucketID string) (*b2api.ListUnfinished
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -1034,10 +1060,7 @@ func (c *Cloud) FinishLargeFileUpload(fileId string, sha1Array []string) (*b2api
 		}
 		data, er := post(c.AuthResponse.APIURL+uri.B2FinishLargeFile, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -1048,7 +1071,7 @@ func (c *Cloud) FinishLargeFileUpload(fileId string, sha1Array []string) (*b2api
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -1084,10 +1107,7 @@ func (c *Cloud) CancelLargeFile(fileId string) (*b2api.CanxUpLgFileResp, errs.Er
 		}
 		data, er := post(c.AuthResponse.APIURL+uri.B2CancelLargeFile, req, header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -1098,7 +1118,7 @@ func (c *Cloud) CancelLargeFile(fileId string) (*b2api.CanxUpLgFileResp, errs.Er
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -1248,6 +1268,7 @@ func (u *Upload) SetupPartSizes(fileID string) {
 
 // WriteOut write out upload info
 func (u *Upload) WriteOutFileData2Upload(app string) {
+
 	//Write out preparation of file for upload
 	fmtd, err := json.MarshalIndent(u, "", "    ")
 
@@ -1377,9 +1398,16 @@ func (r *Rtnd) Response(b []byte) {
 	}
 	//receives etag+^+partid
 	ar := strings.Split(string(b), "^")
-	r.etag = ar[0]
-	id, err := strconv.Atoi(ar[1])
-	bserr.WarnErr(err, "id not an integer on response")
+	var id int
+	var err error
+	if len(ar) == 2 {
+		r.etag = ar[0]
+		id, err = strconv.Atoi(ar[1])
+		bserr.WarnErr(err, "id not an integer on response")
+	} else {
+		bserr.WarnErr(err, "id not passed on response")
+		return
+	}
 
 	fmt.Println(id, " Returned: ", r.etag)
 

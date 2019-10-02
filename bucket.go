@@ -39,10 +39,7 @@ func (c *Cloud) ListBuckets(bucketId, bucketName string, bucketType []b2api.Buck
 		}
 		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2ListBuckets, bytes.NewReader(msg), header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -53,7 +50,7 @@ func (c *Cloud) ListBuckets(bucketId, bucketName string, bucketType []b2api.Buck
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7*time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -97,10 +94,7 @@ func (c *Cloud) CreateBucket(bucketName string, bucketType b2api.BucketType,
 		log.Logln(log.DEBUG, "Request:", string(msg))
 		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2CreateBucket, bytes.NewReader(msg), header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -111,7 +105,7 @@ func (c *Cloud) CreateBucket(bucketName string, bucketType b2api.BucketType,
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7*time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -155,10 +149,7 @@ func (c *Cloud) UpdateBucket(bucketId string, bucketType b2api.BucketType,
 		log.Logln(log.DEBUG, "Request:", string(msg))
 		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2UpdateBucket, bytes.NewReader(msg), header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -169,7 +160,7 @@ func (c *Cloud) UpdateBucket(bucketId string, bucketType b2api.BucketType,
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7*time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -210,10 +201,7 @@ func (c *Cloud) DeleteBucket(bucketId string) (*b2api.DeleteBucketResp, errs.Err
 
 		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2DeleteBucket, bytes.NewReader(msg), header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
@@ -224,7 +212,7 @@ func (c *Cloud) DeleteBucket(bucketId string) (*b2api.DeleteBucketResp, errs.Err
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
 						sleep := 7*time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2

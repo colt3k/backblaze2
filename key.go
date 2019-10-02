@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/colt3k/backblaze2/internal/caller"
 	"github.com/colt3k/backblaze2/internal/uri"
 	"github.com/colt3k/backblaze2/perms"
+	log "github.com/colt3k/nglog/ng"
 )
 
 // ListKeys list account keys
@@ -31,22 +31,19 @@ func (c *Cloud) ListKeys() (*b2api.KeysResp, errs.Error) {
 		}
 		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2ListKeys, bytes.NewReader(msg), header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -69,7 +66,6 @@ func (c *Cloud) ListKeys() (*b2api.KeysResp, errs.Error) {
 	}
 	return nil, errs.New(fmt.Errorf("not allowed"), "")
 }
-
 
 // CreateKey create account key
 func (c *Cloud) CreateKey(keyName, keyBucket string, capabilities []string) (*b2api.CreateKeyResp, errs.Error) {
@@ -98,22 +94,19 @@ func (c *Cloud) CreateKey(keyName, keyBucket string, capabilities []string) (*b2
 		}
 		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2CreateKey, bytes.NewReader(msg), header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -151,22 +144,19 @@ func (c *Cloud) DeleteKey(keyId string) (*b2api.DeleteKeyResp, errs.Error) {
 		}
 		mapData, er := caller.MakeCall("POST", c.AuthResponse.APIURL+uri.B2DeleteKey, bytes.NewReader(msg), header)
 		if er != nil {
-			if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" {
-				if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" {
-					log.Printf("%s: trying again", er.Code())
-				}
+			if testRetryErr(er) {
 				// delete it and call again
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := 3 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if er.Code() == "service_unavailable" {
-						log.Println("service unavailable trying again, please stand by")
-						sleep := 7*time.Second
+						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)

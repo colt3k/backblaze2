@@ -63,10 +63,7 @@ func (c *Cloud) AuthAccount() {
 	log.Logln(log.DEBUG, "obtaining new token")
 	mapData, ers := caller.MakeCall("GET", uri.B2AuthAccount, nil, header)
 	if ers != nil {
-		if ers.Code() == "bad_auth_token" || ers.Code() == "expired_auth_token" || ers.Code() == "service_unavailable" {
-			if ers.Code() == "bad_auth_token" || ers.Code() == "expired_auth_token" {
-				log.Printf("%s: trying again", ers.Code())
-			}
+		if testRetryErr(ers) {
 			// delete it and call again
 			AuthCounter += 1
 			if AuthCounter <= MaxAuthTry {
@@ -77,7 +74,7 @@ func (c *Cloud) AuthAccount() {
 					time.Sleep(sleep)
 				}
 				if ers.Code() == "service_unavailable" {
-					log.Println("service unavailable trying again, please stand by")
+					log.Logln(log.WARN,"service unavailable trying again, please stand by")
 					sleep := 7 * time.Second
 					jitter := time.Duration(rand.Int63n(int64(sleep)))
 					sleep = sleep + jitter/2
@@ -110,4 +107,14 @@ func UploaderDir(bucketName string) string {
 	uploadsFile := filepath.Join(bktPath, UploadFolder)
 
 	return uploadsFile
+}
+
+func testRetryErr(er errs.Error) bool {
+	if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" || er.Code() == "misc_error" {
+		if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "misc_error" {
+			log.Logf(log.WARN,"%s: trying again", er.Code())
+		}
+		return true
+	}
+	return false
 }
