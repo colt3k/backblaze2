@@ -45,7 +45,7 @@ func main() {
 func setupCloud() *backblaze2.Cloud {
 	c := backblaze2.CloudStore(ACCT_ID, APP_ID)
 
-	fmt.Printf("\nAuthToken: %s\n", c.AuthResponse.AuthorizationToken)
+	//fmt.Printf("AuthToken: %s\n", c.AuthResponse.AuthorizationToken)
 
 	return c
 }
@@ -157,7 +157,7 @@ func ListFileVersions() error {
 func ListFiles() error {
 	c := setupCloud()
 
-	r, err := c.ListFiles(bucketID, "")
+	r, err := c.ListFiles(bucketID, "", 100)
 	if err != nil {
 		return err
 	}

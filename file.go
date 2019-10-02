@@ -73,7 +73,7 @@ func post(url string, req interface{}, header map[string]string) (map[string]int
 	if er != nil {
 		return nil, er
 	}
-	log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+	//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
 	return mapData, nil
 }
 
@@ -218,7 +218,7 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 		return nil, err
 	}
 
-	log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+	//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
 
 	var b2Response *b2api.UploadPartResponse
 	errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
@@ -374,7 +374,7 @@ func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs
 				}
 			}
 		}
-		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.UploadResp
 		errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -446,7 +446,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 			}
 			return nil, er
 		}
-		log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.UploadResp
 		errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -458,15 +458,20 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 }
 
 // ListFiles list files by name or all in bucket
-func (c *Cloud) ListFiles(bucketId, filename string) (*b2api.ListFilesResponse, errs.Error) {
+func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesResponse, errs.Error) {
 
+	var maxFileCount b2api.MaxFileCount
+	maxFileCount = 100
+	if qty > 100 {
+		maxFileCount = b2api.MaxFileCount(qty)
+	}
 	if perms.ListFileNames(c.AuthResponse) {
 		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
 		req := &b2api.ListFileReq{
 			BucketID:      bucketId,
 			StartFileName: "",
-			MaxFileCount:  100,
+			MaxFileCount:  maxFileCount,
 			Prefix:        filename,
 			Delimiter:     "",
 		}
@@ -492,7 +497,7 @@ func (c *Cloud) ListFiles(bucketId, filename string) (*b2api.ListFilesResponse, 
 					}
 					c.AuthConfig.Clear = true
 					c.AuthAccount()
-					return c.ListFiles(bucketId, filename)
+					return c.ListFiles(bucketId, filename, qty)
 				}
 			}
 			return nil, er
