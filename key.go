@@ -13,7 +13,6 @@ import (
 	"github.com/colt3k/backblaze2/internal/caller"
 	"github.com/colt3k/backblaze2/internal/uri"
 	"github.com/colt3k/backblaze2/perms"
-	log "github.com/colt3k/nglog/ng"
 )
 
 // ListKeys list account keys
@@ -41,8 +40,7 @@ func (c *Cloud) ListKeys() (*b2api.KeysResp, errs.Error) {
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -104,8 +102,7 @@ func (c *Cloud) CreateKey(keyName, keyBucket string, capabilities []string) (*b2
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -154,8 +151,7 @@ func (c *Cloud) DeleteKey(keyId string) (*b2api.DeleteKeyResp, errs.Error) {
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2

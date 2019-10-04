@@ -34,7 +34,7 @@ func BuildBaseDir(appName string) string {
 	path := BaseDir(appName)
 	if _, err := os.Stat(path); err != nil {
 		err = os.MkdirAll(path, os.ModePerm)
-		bserr.StopErr(err)
+		bserr.StopErr(err, nil...)
 	}
 	return path
 }
@@ -106,7 +106,7 @@ func BuildBucketDir(appName, bucketName string) string {
 	path := BucketDir(appName, bucketName)
 	if _, err := os.Stat(path); err != nil {
 		err = os.MkdirAll(path, os.ModePerm)
-		bserr.StopErr(err)
+		bserr.StopErr(err, nil...)
 	}
 	return path
 }

@@ -76,8 +76,7 @@ func (c *Cloud) AuthAccount() {
 					sleep = sleep + jitter/2
 					time.Sleep(sleep)
 				}
-				if ers.Code() == "service_unavailable" {
-					log.Logln(log.WARN,"service unavailable trying again, please stand by")
+				if testServiceUnavail(ers){
 					sleep := 7 * time.Second
 					jitter := time.Duration(rand.Int63n(int64(sleep)))
 					sleep = sleep + jitter/2
@@ -115,13 +114,22 @@ func UploaderDir(bucketName string) string {
 }
 
 func testRetryErr(er errs.Error) bool {
-	if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" || er.Code() == "misc_error" {
+
+	if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" ||
+		er.Code() == "misc_error" || (er.Status() >= 500 && er.Status() < 600){
 		if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "misc_error" {
-			log.Logf(log.WARN,"%s: trying again", er.Code())
+			log.Logf(log.INFO,"%s: retry", er.Code())
 		}
 		return true
 	} else {
-		log.Logf(log.ERROR,"Missed Issue? %v", er)
+		log.Logf(log.WARN,"Missed Issue? %v", er)
+	}
+	return false
+}
+func testServiceUnavail(er errs.Error) bool {
+	if er.Code() == "service_unavailable" {
+		log.Logln(log.INFO, "retry")
+		return true
 	}
 	return false
 }

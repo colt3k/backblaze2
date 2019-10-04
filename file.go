@@ -127,7 +127,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 			// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
 			AuthCounter += 1
 			if AuthCounter <= MaxAuthTry {
-				log.Logln(log.WARN,"[multipart] service unavailable trying again, please stand by")
+				log.Logln(log.WARN,"[multipart] ..")
 				sleep := 7 * time.Second
 				jitter := time.Duration(rand.Int63n(int64(sleep)))
 				sleep = sleep + jitter/2
@@ -189,7 +189,7 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 
 	r := ioutil.NopCloser(bytes.NewReader(partBuffer))
 	log.Logln(log.DEBUG, "Uploading: ", partID, " Size: ", size)
-	rc := passthrough.NewStream(r, size, up.File.Name(), int(partID), int(up.TotalPartsCount), 5)
+	rc := passthrough.NewStream(r, size, up.File.Name(), int(partID), int(up.TotalPartsCount), 5, false)
 
 	mapData, err := caller.MakeCall("POST", fupr.UploadURL, rc, header)
 	if err != nil {
@@ -243,8 +243,7 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -321,7 +320,7 @@ func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs
 		rdr := bytes.NewReader(data)
 		r := ioutil.NopCloser(rdr)
 		log.Logln(log.DEBUG, "Uploading  Size: ", f.Size())
-		rc := passthrough.NewStream(r, f.Size(), f.Name(), 1, 1, 1)
+		rc := passthrough.NewStream(r, f.Size(), f.Name(), 1, 1, 1, false)
 
 		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
 		if er != nil {
@@ -341,8 +340,7 @@ func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -394,7 +392,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 		rdr := bytes.NewReader(data)
 		r := ioutil.NopCloser(rdr)
 		log.Logln(log.DEBUG, "Uploading  Size: ", sz)
-		rc := passthrough.NewStream(r, int64(sz), fname, 1, 1, 1)
+		rc := passthrough.NewStream(r, int64(sz), fname, 1, 1, 1, false)
 		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
 		if er != nil {
 			if rc != nil {
@@ -413,8 +411,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -470,8 +467,7 @@ func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesR
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -522,8 +518,7 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -570,8 +565,7 @@ func (c *Cloud) DeleteFile(fileName, fileID string) (*b2api.DeleteFileVersionRes
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -618,8 +612,7 @@ func (c *Cloud) HideFile(bucketId, fileName string) (*b2api.HideFileResponse, er
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -665,8 +658,7 @@ func (c *Cloud) GetFileInfo(fileID string) (*b2api.GetFileInfoResponse, errs.Err
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -721,8 +713,7 @@ func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationIn
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -779,8 +770,7 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -867,8 +857,7 @@ func (c *Cloud) StartLargeFile(bucketID, fileInfo string, up *Upload) (*b2api.St
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -913,8 +902,7 @@ func (c *Cloud) GetUploadPartURL(fileID string) (*b2api.GetFileUploadPartRespons
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -961,8 +949,7 @@ func (c *Cloud) ListPartsURL(fileID string, startPartNo, maxPartCount int64) (*b
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -1011,8 +998,7 @@ func (c *Cloud) ListUnfinishedLargeFiles(bucketID string) (*b2api.ListUnfinished
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -1057,8 +1043,7 @@ func (c *Cloud) FinishLargeFileUpload(fileId string, sha1Array []string) (*b2api
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -1104,8 +1089,7 @@ func (c *Cloud) CancelLargeFile(fileId string) (*b2api.CanxUpLgFileResp, errs.Er
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7 * time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2

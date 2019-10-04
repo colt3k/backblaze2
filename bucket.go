@@ -49,8 +49,7 @@ func (c *Cloud) ListBuckets(bucketId, bucketName string, bucketType []b2api.Buck
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7*time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -105,8 +104,7 @@ func (c *Cloud) CreateBucket(bucketName string, bucketType b2api.BucketType,
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7*time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -161,8 +159,7 @@ func (c *Cloud) UpdateBucket(bucketId string, bucketType b2api.BucketType,
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7*time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
@@ -214,8 +211,7 @@ func (c *Cloud) DeleteBucket(bucketId string) (*b2api.DeleteBucketResp, errs.Err
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
-					if er.Code() == "service_unavailable" {
-						log.Logln(log.WARN,"service unavailable trying again, please stand by")
+					if testServiceUnavail(er){
 						sleep := 7*time.Second
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
