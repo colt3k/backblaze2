@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/colt3k/nglog/ers/bserr"
 	log "github.com/colt3k/nglog/ng"
 	"github.com/colt3k/utils/encode"
 	"github.com/colt3k/utils/encode/encodeenum"
@@ -45,6 +46,7 @@ func (c *Cloud) AuthAccount() {
 	if token != nil {
 		//log.Logln(log.DEBUG, "returning existing token")
 		c.AuthResponse = token
+		AuthCounter = 0
 		return
 	}
 
@@ -86,18 +88,20 @@ func (c *Cloud) AuthAccount() {
 				return
 			}
 		}
-		panic(ers)
+		log.Logln(log.ERROR, "AuthCounter ", AuthCounter)
+		bserr.StopErr(ers, "issue obtaining auth token")
 	}
 	b2Response := &b2api.AuthorizationResp{}
 	errUn := json.Unmarshal(mapData["body"].([]byte), b2Response)
 	if errUn != nil {
-		panic(errs.New(errUn, ""))
+		bserr.StopErr(errUn, "issue unmarshalling body")
 	}
 	if b2Response != nil && len(b2Response.AuthorizationToken) > 0 {
 		//write out
 		env.WriteToken(c.AuthConfig.AppName, mapData["body"].([]byte))
 	}
 	c.AuthResponse = b2Response
+	AuthCounter = 0
 }
 
 // UploaderDir build uploader directory
@@ -116,6 +120,8 @@ func testRetryErr(er errs.Error) bool {
 			log.Logf(log.WARN,"%s: trying again", er.Code())
 		}
 		return true
+	} else {
+		log.Logf(log.ERROR,"Missed Issue? %v", er)
 	}
 	return false
 }

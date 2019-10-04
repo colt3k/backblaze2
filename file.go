@@ -78,7 +78,7 @@ func post(url string, req interface{}, header map[string]string) (map[string]int
 }
 
 // SendParts send parts to target
-func (c *Cloud) SendParts(up *Upload) bool {
+func (c *Cloud) SendParts(up *Upload) (bool, error) {
 
 	// This controls the Upload of PARTS using UploadPart
 	if perms.StartLargeFile(c.AuthResponse) {
@@ -120,49 +120,27 @@ func (c *Cloud) SendParts(up *Upload) bool {
 			}
 			_, err := c.FinishLargeFileUpload(up.FileID, shas)
 			if err != nil {
-				return false
+				return false, err
 			}
-			return true
+			return true, nil
 		} else {
 			// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
-			log.Println("service issue trying again, please stand by")
-			sleep := 3 * time.Second
-			jitter := time.Duration(rand.Int63n(int64(sleep)))
-			sleep = sleep + jitter/2
-			time.Sleep(sleep)
-			for _, d := range parts {
-				d := d
-				if len(d.Etag) <= 0 {
-					//Create Task, send to worker
-					task := concur.NewTask(
-						func() (error, []byte) {
-							et := c.worker(up, d, fo)
-							return nil, []byte(et)
-						},
-						NewRtnd(up))
+			AuthCounter += 1
+			if AuthCounter <= MaxAuthTry {
+				log.Logln(log.WARN,"[multipart] service unavailable trying again, please stand by")
+				sleep := 7 * time.Second
+				jitter := time.Duration(rand.Int63n(int64(sleep)))
+				sleep = sleep + jitter/2
+				time.Sleep(sleep)
 
-					tasks = append(tasks, task)
-				}
-			}
-			p := concur.NewPool(tasks, MaxPerSessionUploadPerPart)
-			p.Run()
-
-			if up.Completed() {
-				//Completed Finish off
-				shas := make([]string, 0)
-				for _, d := range parts {
-					shas = append(shas, d.Etag)
-				}
-				_, err := c.FinishLargeFileUpload(up.FileID, shas)
-				if err != nil {
-					return false
-				}
-				return true
+				c.AuthConfig.Clear = true
+				c.AuthAccount()
+				return c.SendParts(up)
 			}
 		}
-		return false
+		return false, fmt.Errorf("issue upload all parts")
 	}
-	return false
+	return false, fmt.Errorf("authorization issue uploading multipart file")
 }
 
 func (c *Cloud) worker(up *Upload, p *UploaderPart, fo *os.File) string {
@@ -215,6 +193,9 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 
 	mapData, err := caller.MakeCall("POST", fupr.UploadURL, rc, header)
 	if err != nil {
+		if testRetryErr(err) {
+
+		}
 		return nil, err
 	}
 
@@ -276,7 +257,7 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.UploadURLResp
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -344,7 +325,6 @@ func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs
 
 		mapData, er := caller.MakeCall("POST", upURL.UploadURL, rc, header)
 		if er != nil {
-			return nil, er
 			if rc != nil {
 				rc.Close()
 			}
@@ -374,6 +354,7 @@ func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs
 				}
 			}
 		}
+		AuthCounter = 0
 		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.UploadResp
 		errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
@@ -446,6 +427,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 			}
 			return nil, er
 		}
+		AuthCounter = 0
 		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.UploadResp
 		errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
@@ -502,7 +484,7 @@ func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesR
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.ListFilesResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -554,7 +536,7 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.ListFileVersionsResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -602,7 +584,7 @@ func (c *Cloud) DeleteFile(fileName, fileID string) (*b2api.DeleteFileVersionRes
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.DeleteFileVersionResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -650,7 +632,7 @@ func (c *Cloud) HideFile(bucketId, fileName string) (*b2api.HideFileResponse, er
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.HideFileResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -697,7 +679,7 @@ func (c *Cloud) GetFileInfo(fileID string) (*b2api.GetFileInfoResponse, errs.Err
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.GetFileInfoResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -753,7 +735,7 @@ func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationIn
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.DownloadAuthResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -811,7 +793,7 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		return mapData, nil
 	}
 	return nil, errs.New(fmt.Errorf("not allowed"), "")
@@ -899,7 +881,7 @@ func (c *Cloud) StartLargeFile(bucketID, fileInfo string, up *Upload) (*b2api.St
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.StartLargeFileResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -945,7 +927,7 @@ func (c *Cloud) GetUploadPartURL(fileID string) (*b2api.GetFileUploadPartRespons
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.GetFileUploadPartResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -993,7 +975,7 @@ func (c *Cloud) ListPartsURL(fileID string, startPartNo, maxPartCount int64) (*b
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.ListPartsResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -1043,7 +1025,7 @@ func (c *Cloud) ListUnfinishedLargeFiles(bucketID string) (*b2api.ListUnfinished
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.ListUnfinishedLargeFilesResponse
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -1089,7 +1071,7 @@ func (c *Cloud) FinishLargeFileUpload(fileId string, sha1Array []string) (*b2api
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		//Convert Message
 		var b2Response b2api.FinishUpLgFileResp
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
@@ -1136,7 +1118,7 @@ func (c *Cloud) CancelLargeFile(fileId string) (*b2api.CanxUpLgFileResp, errs.Er
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.CanxUpLgFileResp
 		errUn := json.Unmarshal(data["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -1314,7 +1296,7 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 		u.WriteOutFileData2Upload(AppFolderName)
 
 		// Start sending parts
-		if c.SendParts(u) {
+		if ok, err := c.SendParts(u); ok {
 			log.Logf(log.INFO, "Upload Completed successfully into %s", u.Bucket)
 			uploadFile := UploaderDir(u.Bucket)
 			log.Logf(log.INFO, "removing upload file %s", uploadFile)
@@ -1323,7 +1305,7 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 			}
 			return u.FileID, nil
 		} else {
-			return "", fmt.Errorf("upload failed, try again later")
+			return "", fmt.Errorf("upload failed, try again later %v", err)
 		}
 
 	} else if !u.ValidateOverMinPartSize() {

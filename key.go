@@ -56,7 +56,7 @@ func (c *Cloud) ListKeys() (*b2api.KeysResp, errs.Error) {
 
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.KeysResp
 		errUn = json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -118,7 +118,7 @@ func (c *Cloud) CreateKey(keyName, keyBucket string, capabilities []string) (*b2
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.CreateKeyResp
 		errUn = json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -168,7 +168,7 @@ func (c *Cloud) DeleteKey(keyId string) (*b2api.DeleteKeyResp, errs.Error) {
 			}
 			return nil, er
 		}
-
+		AuthCounter = 0
 		var b2Response b2api.DeleteKeyResp
 		errUn = json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
