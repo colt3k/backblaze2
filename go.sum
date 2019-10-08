@@ -25,6 +25,8 @@ github.com/colt3k/utils/io v0.0.10 h1:PCQ5xs6rkrOFzn6jWSDgdpAbushDDyRw7HFI2oJ0ev
 github.com/colt3k/utils/io v0.0.10/go.mod h1:kN2O1zdVzYCTPapzBg+yg5HJdQxUKy8MxUu14wYs9Cc=
 github.com/colt3k/utils/io v0.0.11 h1:PGKcr656qj5jKFaimjzwZfOgisSnYkC0NXTYErQyOXs=
 github.com/colt3k/utils/io v0.0.11/go.mod h1:kN2O1zdVzYCTPapzBg+yg5HJdQxUKy8MxUu14wYs9Cc=
+github.com/colt3k/utils/io v0.0.12 h1:ZZU+6chrccXBGIEYs7cpEXND27BkchiM3LOl7mBh+3o=
+github.com/colt3k/utils/io v0.0.12/go.mod h1:kN2O1zdVzYCTPapzBg+yg5HJdQxUKy8MxUu14wYs9Cc=
 github.com/colt3k/utils/mathut v0.0.1 h1:o/aIDspFY3PPdP1L1Xn/TSBp0V2m0o7X7MPxmCzeYtI=
 github.com/colt3k/utils/mathut v0.0.1/go.mod h1:YK4vx6fJOhaIJ3idYVcILYl99CNpLol7mlG+K+PnJNw=
 github.com/colt3k/utils/netut v0.0.1 h1:KEgxUX5rY+v2gNaXBTnmeyO94VNo0ZSsSbjMojS2870=
@@ -81,4 +83,6 @@ golang.org/x/sys v0.0.0-20190526052359-791d8a0f4d09/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191003212358-c178f38b412c h1:6Zx7DRlKXf79yfxuQ/7GqV3w2y7aDsk6bGg0MzF5RVU=
 golang.org/x/sys v0.0.0-20191003212358-c178f38b412c/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20191007154456-ef33b2fb2c41 h1:OC2BiV9nQHWgVMNbxZ5/eZKWnnd3Z4H9W5zdNvC4EBc=
+golang.org/x/sys v0.0.0-20191007154456-ef33b2fb2c41/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
