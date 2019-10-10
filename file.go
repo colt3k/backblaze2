@@ -125,7 +125,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 			return true, nil
 		} else {
 			// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
-			log.Logln(log.WARN, "[multipart] ..")
+			log.Logln(log.WARN, "[multipart1] ..")
 			sleep := 7 * time.Second
 			jitter := time.Duration(rand.Int63n(int64(sleep)))
 			sleep = sleep + jitter/2
@@ -134,6 +134,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 			c.AuthConfig.Clear = true
 			c.AuthAccount()
 
+			tasks = nil
 			// TRY AGAIN HERE!!!
 			for _, d := range parts {
 				d := d
@@ -166,7 +167,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 				}
 				return true, nil
 			} else {
-				log.Logln(log.WARN, "[multipart] ..")
+				log.Logln(log.WARN, "[multipart2] ..")
 				sleep := 7 * time.Second
 				jitter := time.Duration(rand.Int63n(int64(sleep)))
 				sleep = sleep + jitter/2
@@ -175,6 +176,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 				c.AuthConfig.Clear = true
 				c.AuthAccount()
 
+				tasks = nil
 				// TRY AGAIN HERE!!!
 				for _, d := range parts {
 					d := d
