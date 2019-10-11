@@ -43,7 +43,7 @@ func main() {
 }
 
 func setupCloud() *backblaze2.Cloud {
-	c := backblaze2.CloudStore(ACCT_ID, APP_ID)
+	c := backblaze2.CloudStore(ACCT_ID, APP_ID, "ctexample")
 
 	//fmt.Printf("AuthToken: %s\n", c.AuthResponse.AuthorizationToken)
 

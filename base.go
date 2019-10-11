@@ -33,9 +33,9 @@ type Cloud struct {
 	AuthResponse *b2api.AuthorizationResp
 }
 
-func CloudStore(accountId, appId string) *Cloud {
+func CloudStore(accountId, appId, appName string) *Cloud {
 	t := new(Cloud)
-	t.AuthConfig = b2api.AuthConfig{AccountID: accountId, ApplicationID: appId, Clear: false, AppName: "example"}
+	t.AuthConfig = b2api.AuthConfig{AccountID: accountId, ApplicationID: appId, Clear: false, AppName: appName}
 	t.AuthAccount()
 	return t
 }

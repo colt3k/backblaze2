@@ -266,9 +266,6 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 
 	mapData, err := caller.MakeCall("POST", fupr.UploadURL, rc, header)
 	if err != nil {
-		if testRetryErr(err) {
-
-		}
 		return nil, err
 	}
 
