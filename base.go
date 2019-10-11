@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
 	"github.com/colt3k/nglog/ers/bserr"
@@ -122,7 +123,7 @@ func testRetryErr(er errs.Error) bool {
 		}
 		return true
 	} else {
-		log.Logf(log.WARN,"Missed Issue? %v", er)
+		log.Logf(log.WARN,"Missed Issue? %v\n%s", er, string(debug.Stack()))
 	}
 	return false
 }
