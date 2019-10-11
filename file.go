@@ -83,19 +83,15 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 	// This controls the Upload of PARTS using UploadPart
 	if perms.StartLargeFile(c.AuthResponse) {
 
-		// Get parts we created earlier
-		parts := up.RetrieveToUpload()
-
 		//Create Worker Pool to upload ***************************************
-
 		var tasks []*concur.Task
 		fo, err := os.Open(up.File.Path())
 		bserr.StopErr(err, "err opening file")
 		defer fo.Close()
 
-		for _, d := range parts {
+		for _, d := range up.Parts {
 			d := d
-			if len(d.Etag) <= 0 {
+			if len(strings.TrimSpace(d.Etag)) <= 0 {
 				//Create Task, send to worker
 				task := concur.NewTask(
 					func() (error, []byte) {
@@ -115,7 +111,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 		if up.Completed() {
 			//Completed Finish off
 			shas := make([]string, 0)
-			for _, d := range parts {
+			for _, d := range up.Parts {
 				shas = append(shas, d.Etag)
 			}
 			_, err := c.FinishLargeFileUpload(up.FileID, shas)
@@ -136,9 +132,9 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 
 			tasks = nil
 			// TRY AGAIN HERE!!!
-			for _, d := range parts {
+			for _, d := range up.Parts {
 				d := d
-				if len(d.Etag) <= 0 {
+				if len(strings.TrimSpace(d.Etag)) <= 0 {
 					//Create Task, send to worker
 					task := concur.NewTask(
 						func() (error, []byte) {
@@ -158,7 +154,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 			if up.Completed() {
 				//Completed Finish off
 				shas := make([]string, 0)
-				for _, d := range parts {
+				for _, d := range up.Parts {
 					shas = append(shas, d.Etag)
 				}
 				_, err := c.FinishLargeFileUpload(up.FileID, shas)
@@ -178,9 +174,9 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 
 				tasks = nil
 				// TRY AGAIN HERE!!!
-				for _, d := range parts {
+				for _, d := range up.Parts {
 					d := d
-					if len(d.Etag) <= 0 {
+					if len(strings.TrimSpace(d.Etag)) <= 0 {
 						//Create Task, send to worker
 						task := concur.NewTask(
 							func() (error, []byte) {
@@ -200,7 +196,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 				if up.Completed() {
 					//Completed Finish off
 					shas := make([]string, 0)
-					for _, d := range parts {
+					for _, d := range up.Parts {
 						shas = append(shas, d.Etag)
 					}
 					_, err := c.FinishLargeFileUpload(up.FileID, shas)
@@ -1394,15 +1390,15 @@ func (u *Upload) UpdateEtag(partID int, appName, tag string) {
 }
 
 // RetrieveToUpload retrieve etag
-func (u *Upload) RetrieveToUpload() []*UploaderPart {
-	toUpload := make([]*UploaderPart, 0)
-	for _, d := range u.Parts {
-		if len(strings.TrimSpace(d.Etag)) <= 0 {
-			toUpload = append(toUpload, d)
-		}
-	}
-	return toUpload
-}
+//func (u *Upload) RetrieveToUpload() []*UploaderPart {
+//	toUpload := make([]*UploaderPart, 0)
+//	for _, d := range u.Parts {
+//		if len(strings.TrimSpace(d.Etag)) <= 0 {
+//			toUpload = append(toUpload, d)
+//		}
+//	}
+//	return toUpload
+//}
 
 // Completed has this finished
 func (u *Upload) Completed() bool {
