@@ -63,7 +63,7 @@ func (c *Cloud) ListBuckets(bucketId, bucketName string, bucketType []b2api.Buck
 			return nil, er
 		}
 		AuthCounter = 0
-		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		log.Logln(log.DEBUGX2, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.ListBucketsResp
 		errUn = json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -118,7 +118,7 @@ func (c *Cloud) CreateBucket(bucketName string, bucketType b2api.BucketType,
 			return nil, er
 		}
 		AuthCounter = 0
-		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		log.Logln(log.DEBUGX2, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.CreateBucketResp
 		errUn = json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -173,7 +173,7 @@ func (c *Cloud) UpdateBucket(bucketId string, bucketType b2api.BucketType,
 			return nil, er
 		}
 		AuthCounter = 0
-		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		log.Logln(log.DEBUGX2, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.CreateBucketResp
 		errUn = json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -225,7 +225,7 @@ func (c *Cloud) DeleteBucket(bucketId string) (*b2api.DeleteBucketResp, errs.Err
 			return nil, er
 		}
 		AuthCounter = 0
-		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		log.Logln(log.DEBUGX2, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.DeleteBucketResp
 		errUn = json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {

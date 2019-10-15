@@ -59,7 +59,6 @@ const (
 var (
 	//MaxPerSessionUploadPerPart sessions
 	MaxPerSessionUploadPerPart = 3
-	fcLg                       bool
 )
 
 func post(url string, req interface{}, header map[string]string) (map[string]interface{}, errs.Error) {
@@ -73,7 +72,7 @@ func post(url string, req interface{}, header map[string]string) (map[string]int
 	if er != nil {
 		return nil, er
 	}
-	//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+	log.Logln(log.DEBUGX2, "Actual return: ", string(mapData["body"].([]byte)))
 	return mapData, nil
 }
 
@@ -89,13 +88,13 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 		bserr.StopErr(err, "err opening file")
 		defer fo.Close()
 
-		for _, d := range up.Parts {
-			d := d
-			if len(strings.TrimSpace(d.Etag)) <= 0 {
+		for _, part := range up.Parts {
+			prt := part
+			if len(strings.TrimSpace(prt.Etag)) <= 0 {
 				//Create Task, send to worker
 				task := concur.NewTask(
 					func() (error, []byte) {
-						et := c.worker(up, d, fo)
+						et := c.worker(up, prt, fo)
 						return nil, []byte(et)
 					},
 					NewRtnd(up))
@@ -132,13 +131,13 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 
 			tasks = nil
 			// TRY AGAIN HERE!!!
-			for _, d := range up.Parts {
-				d := d
-				if len(strings.TrimSpace(d.Etag)) <= 0 {
+			for _, part := range up.Parts {
+				prt := part
+				if len(strings.TrimSpace(prt.Etag)) <= 0 {
 					//Create Task, send to worker
 					task := concur.NewTask(
 						func() (error, []byte) {
-							et := c.worker(up, d, fo)
+							et := c.worker(up, prt, fo)
 							return nil, []byte(et)
 						},
 						NewRtnd(up))
@@ -174,13 +173,13 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 
 				tasks = nil
 				// TRY AGAIN HERE!!!
-				for _, d := range up.Parts {
-					d := d
-					if len(strings.TrimSpace(d.Etag)) <= 0 {
+				for _, part := range up.Parts {
+					prt := part
+					if len(strings.TrimSpace(prt.Etag)) <= 0 {
 						//Create Task, send to worker
 						task := concur.NewTask(
 							func() (error, []byte) {
-								et := c.worker(up, d, fo)
+								et := c.worker(up, prt, fo)
 								return nil, []byte(et)
 							},
 							NewRtnd(up))
@@ -248,7 +247,8 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 	header["Content-Length"] = mathut.FmtInt(int(size))
 
 	//Create a buffer of the partial size to load with data
-	partBuffer := make([]byte, p.Size)
+	log.Logf(log.INFO, "create partBuffer of size %v", p.Size)
+	partBuffer := make([]byte, p.Size) // len out of range
 	//Read data into byte array
 	fo.ReadAt(partBuffer, p.Start)
 
@@ -265,7 +265,7 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 		return nil, err
 	}
 
-	//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+	log.Logln(log.DEBUGX2, "Actual return: ", string(mapData["body"].([]byte)))
 
 	var b2Response *b2api.UploadPartResponse
 	errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
@@ -419,7 +419,7 @@ func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs
 			}
 		}
 		AuthCounter = 0
-		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		log.Logln(log.DEBUGX2, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.UploadResp
 		errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -491,7 +491,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 			return nil, er
 		}
 		AuthCounter = 0
-		//log.Logln(log.DEBUG, "Actual return: ", string(mapData["body"].([]byte)))
+		log.Logln(log.DEBUGX2, "Actual return: ", string(mapData["body"].([]byte)))
 		var b2Response b2api.UploadResp
 		errUn := json.Unmarshal(mapData["body"].([]byte), &b2Response)
 		if errUn != nil {
@@ -1201,6 +1201,7 @@ type Upload struct {
 	Parts           []*UploaderPart `json:"parts"`
 	TotalPartsCount uint64          `json:"total_parts_count"`
 	mu              sync.Mutex
+	fcLg            bool
 }
 
 // New create upload object
@@ -1248,8 +1249,10 @@ func (u *Upload) ComputePartTotal() error {
 	log.Logln(log.DEBUG, "How many pieces should we create?", u.TotalPartsCount)
 	if u.TotalPartsCount > maxParts {
 		//Set to 1GB if parts would be over 100
-		fcLg = true
+		u.fcLg = true
 		u.TotalPartsCount = uint64(math.Ceil(float64(u.File.Size()) / float64(fileChunkLg)))
+	} else {
+		u.fcLg = false
 	}
 	if u.TotalPartsCount > maxParts {
 		return fmt.Errorf("part count over max allowed: %d, max: %d", u.TotalPartsCount, maxParts)
@@ -1268,18 +1271,12 @@ func (u *Upload) SetupPartSizes(fileID string) {
 	u.FileID = fileID
 	u.Parts = make([]*UploaderPart, u.TotalPartsCount)
 
-	//Open file to read and determine start/end of each part
-	//fo, err := os.Open(u.File.Path())
-	//bserr.Err(err, "err opening file")
-	//
-	//defer fo.Close()
-
 	var lastsize, start, end int64
 
 	for i := uint64(0); i < u.TotalPartsCount; i++ {
 		// file size - this chunk is the size of the part
 		partSize := int64(math.Min(fileChunk, float64(u.File.Size()-int64(i*fileChunk))))
-		if fcLg {
+		if u.fcLg {
 			partSize = int64(math.Min(fileChunkLg, float64(u.File.Size()-int64(i*fileChunkLg))))
 		}
 
@@ -1299,7 +1296,7 @@ func (u *Upload) SetupPartSizes(fileID string) {
 			end = start + partSize
 		}
 		u.Parts[i] = NewUploaderPart(i+1, start, end, partSize)
-		log.Logf(log.DEBUG, "part %d: full size: %d start %d end %d", i, u.File.Size(), start, end)
+		log.Logf(log.DEBUG, "part %d: full size: %d start %d end %d partSize %v", i, u.File.Size(), start, end, partSize)
 	}
 }
 

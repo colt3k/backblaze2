@@ -45,7 +45,7 @@ func (c *Cloud) AuthAccount() {
 	// if it exists and is less than 24hrs old use it first, otherwise renew it
 	token := env.Token(c.AuthConfig.AppName, c.AuthConfig.Clear)
 	if token != nil {
-		//log.Logln(log.DEBUG, "returning existing token")
+		log.Logln(log.DEBUGX2, "returning existing token")
 		c.AuthResponse = token
 		AuthCounter = 0
 		return
