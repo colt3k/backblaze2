@@ -119,7 +119,7 @@ func testRetryErr(er errs.Error) bool {
 	if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" ||
 		er.Code() == "misc_error" || (er.Status() >= 500 && er.Status() < 600){
 		if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "misc_error" {
-			log.Logf(log.INFO,"%s: retry", er.Code())
+			log.Logf(log.INFO,"%d %s: retrying", er.Status(), er.Code())
 		}
 		if er.Status() < 500 && er.Status() > 600 {
 			log.Logf(log.WARN,"%s", string(debug.Stack()))
@@ -132,7 +132,7 @@ func testRetryErr(er errs.Error) bool {
 }
 func testServiceUnavail(er errs.Error) bool {
 	if er.Code() == "service_unavailable" {
-		log.Logln(log.INFO, "retry")
+		log.Logln(log.INFO, "retrying")
 		return true
 	}
 	return false

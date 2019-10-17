@@ -120,7 +120,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 			return true, nil
 		} else {
 			// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
-			log.Logln(log.WARN, "[multipart1] ..")
+			log.Logln(log.DEBUG, "[multipart1] ..")
 			sleep := 7 * time.Second
 			jitter := time.Duration(rand.Int63n(int64(sleep)))
 			sleep = sleep + jitter/2
@@ -247,7 +247,7 @@ func UploadPart(fupr *b2api.GetFileUploadPartResponse, up *Upload, p *UploaderPa
 	header["Content-Length"] = mathut.FmtInt(int(size))
 
 	//Create a buffer of the partial size to load with data
-	log.Logf(log.INFO, "create partBuffer of size %v", p.Size)
+	log.Logf(log.DEBUGX2, "create partBuffer of size %v", p.Size)
 	partBuffer := make([]byte, p.Size) // len out of range
 	//Read data into byte array
 	fo.ReadAt(partBuffer, p.Start)
@@ -1223,6 +1223,21 @@ func (u *Upload) Available() bool {
 	return u.File.Available()
 }
 
+func Load(filepath string) *Upload {
+	t := new(Upload)
+
+	f, err := os.Open(filepath)
+	bserr.Err(err, "error opening existing upload file", filepath)
+
+	err = json.NewDecoder(f).Decode(&t)
+	bserr.StopErr(err)
+	f.Close()
+	// initialize
+	t.File = filenative.NewFile(t.Filepath)
+
+	return t
+}
+
 // ValidateOverMinPartSize check size
 func (u *Upload) ValidateOverMinPartSize() bool {
 	log.Logln(log.DEBUG, "FileSize:", u.File.Size())
@@ -1257,7 +1272,7 @@ func (u *Upload) ComputePartTotal() error {
 	if u.TotalPartsCount > maxParts {
 		return fmt.Errorf("part count over max allowed: %d, max: %d", u.TotalPartsCount, maxParts)
 	}
-	log.Logf(log.INFO, "Splitting into %d pieces.\n", u.TotalPartsCount)
+	log.Logf(log.DEBUG, "Splitting into %d pieces.\n", u.TotalPartsCount)
 	return nil
 }
 
@@ -1344,9 +1359,9 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 
 		// Start sending parts
 		if ok, err := c.SendParts(u); ok {
-			log.Logf(log.INFO, "Upload Completed successfully into %s", u.Bucket)
+			log.Logf(log.DEBUG, "Upload Completed successfully into %s", u.Bucket)
 			uploadFile := UploaderDir(u.Bucket)
-			log.Logf(log.INFO, "removing upload file %s", uploadFile)
+			log.Logf(log.DEBUG, "removing upload file %s", uploadFile)
 			if !file.Delete(uploadFile) {
 				log.Logf(log.WARN, "upload file not removed %s", uploadFile)
 			}
