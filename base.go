@@ -126,7 +126,7 @@ func testRetryErr(er errs.Error) bool {
 		}
 		return true
 	} else {
-		log.Logf(log.WARN,"Missed Issue? %v\n%s", er, string(debug.Stack()))
+		log.Logf(log.WARN,"Missed Issue? %+v\n%s", er, string(debug.Stack()))
 	}
 	return false
 }

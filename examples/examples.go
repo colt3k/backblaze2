@@ -38,7 +38,7 @@ func main() {
 	//er := ListFileVersions()
 	er := UploadFile()
 	if er != nil {
-		fmt.Printf("%v", er)
+		fmt.Printf("%+v", er)
 	}
 }
 

@@ -1367,7 +1367,7 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 			}
 			return u.FileID, nil
 		} else {
-			return "", fmt.Errorf("upload failed, try again later %v", err)
+			return "", fmt.Errorf("upload failed, try again later %+v", err)
 		}
 
 	} else if !u.ValidateOverMinPartSize() {
