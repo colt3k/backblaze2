@@ -126,7 +126,9 @@ func testRetryErr(er errs.Error) bool {
 		}
 		return true
 	} else {
-		log.Logf(log.WARN,"Missed Issue? %+v\n%s", er, string(debug.Stack()))
+		if er.Code() != "not_found" {
+			log.Logf(log.WARN,"Missed Issue? %+v\n%s", er, string(debug.Stack()))
+		}
 	}
 	return false
 }
