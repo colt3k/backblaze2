@@ -118,7 +118,7 @@ func testRetryErr(er errs.Error) bool {
 
 	if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" ||
 		er.Code() == "misc_error" || (er.Status() >= 500 && er.Status() < 600){
-		if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "misc_error" {
+		if er.Code() == "bad_auth_token" || er.Code() == "misc_error" {
 			log.Logf(log.INFO,"%d %s: retrying", er.Status(), er.Code())
 		}
 		if er.Status() < 500 && er.Status() > 600 {
