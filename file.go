@@ -121,7 +121,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 		} else {
 			// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
 			log.Logln(log.DEBUG, "[multipart1] ..")
-			sleep := 7 * time.Second
+			sleep := (7 * time.Second) * MaxAuthTry
 			jitter := time.Duration(rand.Int63n(int64(sleep)))
 			sleep = sleep + jitter/2
 			time.Sleep(sleep)
@@ -163,7 +163,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 				return true, nil
 			} else {
 				log.Logln(log.WARN, "[multipart2] ..")
-				sleep := 7 * time.Second
+				sleep := (7 * time.Second) * MaxAuthTry
 				jitter := time.Duration(rand.Int63n(int64(sleep)))
 				sleep = sleep + jitter/2
 				time.Sleep(sleep)
@@ -304,13 +304,13 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -401,13 +401,13 @@ func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -472,13 +472,13 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -528,13 +528,13 @@ func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesR
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -579,13 +579,13 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -626,13 +626,13 @@ func (c *Cloud) DeleteFile(fileName, fileID string) (*b2api.DeleteFileVersionRes
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -673,13 +673,13 @@ func (c *Cloud) HideFile(bucketId, fileName string) (*b2api.HideFileResponse, er
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -719,13 +719,13 @@ func (c *Cloud) GetFileInfo(fileID string) (*b2api.GetFileInfoResponse, errs.Err
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -774,13 +774,13 @@ func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationIn
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -831,13 +831,13 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -918,13 +918,13 @@ func (c *Cloud) StartLargeFile(bucketID, fileInfo string, up *Upload) (*b2api.St
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -963,13 +963,13 @@ func (c *Cloud) GetUploadPartURL(fileID string) (*b2api.GetFileUploadPartRespons
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -1010,13 +1010,13 @@ func (c *Cloud) ListPartsURL(fileID string, startPartNo, maxPartCount int64) (*b
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -1059,13 +1059,13 @@ func (c *Cloud) ListUnfinishedLargeFiles(bucketID string) (*b2api.ListUnfinished
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -1104,13 +1104,13 @@ func (c *Cloud) FinishLargeFileUpload(fileId string, sha1Array []string) (*b2api
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -1150,13 +1150,13 @@ func (c *Cloud) CancelLargeFile(fileId string) (*b2api.CanxUpLgFileResp, errs.Er
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er) {
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)

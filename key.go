@@ -35,13 +35,13 @@ func (c *Cloud) ListKeys() (*b2api.KeysResp, errs.Error) {
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er){
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -97,13 +97,13 @@ func (c *Cloud) CreateKey(keyName, keyBucket string, capabilities []string) (*b2
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er){
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -146,13 +146,13 @@ func (c *Cloud) DeleteKey(keyId string) (*b2api.DeleteKeyResp, errs.Error) {
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3 * time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er){
-						sleep := 7 * time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)

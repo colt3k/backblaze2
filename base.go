@@ -25,7 +25,7 @@ const (
 	AppFolderName = ".cloudstore"
 	// UploadFolder exported folder name
 	UploadFolder = "upload"
-	MaxAuthTry  = 3
+	MaxAuthTry  = 40
 )
 var AuthCounter = 0
 
@@ -72,13 +72,13 @@ func (c *Cloud) AuthAccount() {
 			AuthCounter += 1
 			if AuthCounter <= MaxAuthTry {
 				if AuthCounter > 1 {
-					sleep := 3 * time.Second
+					sleep := (3 * time.Second) * MaxAuthTry
 					jitter := time.Duration(rand.Int63n(int64(sleep)))
 					sleep = sleep + jitter/2
 					time.Sleep(sleep)
 				}
 				if testServiceUnavail(ers){
-					sleep := 7 * time.Second
+					sleep := (7 * time.Second) * MaxAuthTry
 					jitter := time.Duration(rand.Int63n(int64(sleep)))
 					sleep = sleep + jitter/2
 					time.Sleep(sleep)

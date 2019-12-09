@@ -44,13 +44,13 @@ func (c *Cloud) ListBuckets(bucketId, bucketName string, bucketType []b2api.Buck
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er){
-						sleep := 7*time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -99,13 +99,13 @@ func (c *Cloud) CreateBucket(bucketName string, bucketType b2api.BucketType,
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er){
-						sleep := 7*time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -154,13 +154,13 @@ func (c *Cloud) UpdateBucket(bucketId string, bucketType b2api.BucketType,
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er){
-						sleep := 7*time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
@@ -206,13 +206,13 @@ func (c *Cloud) DeleteBucket(bucketId string) (*b2api.DeleteBucketResp, errs.Err
 				AuthCounter += 1
 				if AuthCounter <= MaxAuthTry {
 					if AuthCounter > 1 {
-						sleep := 3*time.Second
+						sleep := (3 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
 					}
 					if testServiceUnavail(er){
-						sleep := 7*time.Second
+						sleep := (7 * time.Second) * MaxAuthTry
 						jitter := time.Duration(rand.Int63n(int64(sleep)))
 						sleep = sleep + jitter/2
 						time.Sleep(sleep)
