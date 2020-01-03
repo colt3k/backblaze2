@@ -558,8 +558,12 @@ func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesR
 }
 
 // ListFileVersions lists out all versions of file
-func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVersionsResponse, errs.Error) {
-
+func (c *Cloud) ListFileVersions(bucketId, fileName string, qty int) (*b2api.ListFileVersionsResponse, errs.Error) {
+	var maxFileCount b2api.MaxFileCount
+	maxFileCount = 100
+	if qty > 100 {
+		maxFileCount = b2api.MaxFileCount(qty)
+	}
 	if perms.ListFileVersions(c.AuthResponse) {
 		header := auth.BuildAuthMap(c.AuthResponse.AuthorizationToken)
 
@@ -567,7 +571,7 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 			BucketID:      bucketId,
 			StartFileName: "",
 			StartFileID:   "",
-			MaxFileCount:  100,
+			MaxFileCount:  maxFileCount,
 			Prefix:        fileName,
 			Delimiter:     "",
 		}
@@ -592,7 +596,7 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string) (*b2api.ListFileVers
 					}
 					c.AuthConfig.Clear = true
 					c.AuthAccount()
-					return c.ListFileVersions(bucketId, fileName)
+					return c.ListFileVersions(bucketId, fileName, qty)
 				}
 			}
 			return nil, er
