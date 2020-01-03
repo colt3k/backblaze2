@@ -503,7 +503,7 @@ func (c *Cloud) UploadVirtualFile(bucketId, fname string, data []byte, lastMod i
 }
 
 // ListFiles list files by name or all in bucket
-func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesResponse, errs.Error) {
+func (c *Cloud) ListFiles(bucketId, filename, startFileName string, qty int) (*b2api.ListFilesResponse, errs.Error) {
 
 	var maxFileCount b2api.MaxFileCount
 	maxFileCount = 100
@@ -515,7 +515,7 @@ func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesR
 
 		req := &b2api.ListFileReq{
 			BucketID:      bucketId,
-			StartFileName: "",
+			StartFileName: startFileName,
 			MaxFileCount:  maxFileCount,
 			Prefix:        filename,
 			Delimiter:     "",
@@ -541,7 +541,7 @@ func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesR
 					}
 					c.AuthConfig.Clear = true
 					c.AuthAccount()
-					return c.ListFiles(bucketId, filename, qty)
+					return c.ListFiles(bucketId, filename, startFileName, qty)
 				}
 			}
 			return nil, er
@@ -558,7 +558,7 @@ func (c *Cloud) ListFiles(bucketId, filename string, qty int) (*b2api.ListFilesR
 }
 
 // ListFileVersions lists out all versions of file
-func (c *Cloud) ListFileVersions(bucketId, fileName string, qty int) (*b2api.ListFileVersionsResponse, errs.Error) {
+func (c *Cloud) ListFileVersions(bucketId, fileName, startFileName, startFileID string, qty int) (*b2api.ListFileVersionsResponse, errs.Error) {
 	var maxFileCount b2api.MaxFileCount
 	maxFileCount = 100
 	if qty > 100 {
@@ -569,8 +569,8 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string, qty int) (*b2api.Lis
 
 		req := &b2api.ListFileVersionsReq{
 			BucketID:      bucketId,
-			StartFileName: "",
-			StartFileID:   "",
+			StartFileName: startFileName,
+			StartFileID:   startFileID,
 			MaxFileCount:  maxFileCount,
 			Prefix:        fileName,
 			Delimiter:     "",
@@ -596,7 +596,7 @@ func (c *Cloud) ListFileVersions(bucketId, fileName string, qty int) (*b2api.Lis
 					}
 					c.AuthConfig.Clear = true
 					c.AuthAccount()
-					return c.ListFileVersions(bucketId, fileName, qty)
+					return c.ListFileVersions(bucketId, fileName, startFileName, startFileID, qty)
 				}
 			}
 			return nil, er
