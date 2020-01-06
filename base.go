@@ -72,16 +72,10 @@ func (c *Cloud) AuthAccount() {
 			AuthCounter += 1
 			if AuthCounter <= MaxAuthTry {
 				if AuthCounter > 1 {
-					sleep := (3 * time.Second) * MaxAuthTry
-					jitter := time.Duration(rand.Int63n(int64(sleep)))
-					sleep = sleep + jitter/2
-					time.Sleep(sleep)
+					shortSleep()
 				}
 				if testServiceUnavail(ers){
-					sleep := (7 * time.Second) * MaxAuthTry
-					jitter := time.Duration(rand.Int63n(int64(sleep)))
-					sleep = sleep + jitter/2
-					time.Sleep(sleep)
+					longSleep()
 				}
 				c.AuthConfig.Clear = true
 				c.AuthAccount()
@@ -134,8 +128,21 @@ func testRetryErr(er errs.Error) bool {
 }
 func testServiceUnavail(er errs.Error) bool {
 	if er.Code() == "service_unavailable" {
-		log.Logln(log.INFO, "retrying")
 		return true
 	}
 	return false
+}
+func shortSleep() {
+	sleep := (3 * time.Second) * MaxAuthTry
+	jitter := time.Duration(rand.Int63n(int64(sleep)))
+	sleep = sleep + jitter/2
+	log.Logf(log.INFO, "retrying in %s seconds", sleep)
+	time.Sleep(sleep)
+}
+func longSleep() {
+	sleep := (7 * time.Second) * MaxAuthTry
+	jitter := time.Duration(rand.Int63n(int64(sleep)))
+	sleep = sleep + jitter/2
+	log.Logf(log.INFO, "retrying in %s seconds", sleep)
+	time.Sleep(sleep)
 }
