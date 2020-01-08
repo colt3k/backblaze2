@@ -136,13 +136,13 @@ func shortSleep() {
 	sleep := (3 * time.Second) * MaxAuthTry
 	jitter := time.Duration(rand.Int63n(int64(sleep)))
 	sleep = sleep + jitter/2
-	log.Logf(log.INFO, "retrying in %s seconds", sleep)
+	log.Logf(log.INFO, "retrying in %s", sleep)
 	time.Sleep(sleep)
 }
 func longSleep() {
 	sleep := (7 * time.Second) * MaxAuthTry
 	jitter := time.Duration(rand.Int63n(int64(sleep)))
 	sleep = sleep + jitter/2
-	log.Logf(log.INFO, "retrying in %s seconds", sleep)
+	log.Logf(log.INFO, "retrying in %s", sleep)
 	time.Sleep(sleep)
 }
