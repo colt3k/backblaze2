@@ -85,6 +85,7 @@ func (c *Cloud) AuthAccount() {
 		log.Logln(log.ERROR, "AuthCounter ", AuthCounter)
 		bserr.StopErr(ers, "issue obtaining auth token")
 	}
+	AuthCounter = 0
 	b2Response := &b2api.AuthorizationResp{}
 	errUn := json.Unmarshal(mapData["body"].([]byte), b2Response)
 	if errUn != nil {
