@@ -25,7 +25,7 @@ const (
 	AppFolderName = ".cloudstore"
 	// UploadFolder exported folder name
 	UploadFolder = "upload"
-	MaxAuthTry  = 40
+	MaxAuthTry  = 1000
 )
 var AuthCounter = 0
 
