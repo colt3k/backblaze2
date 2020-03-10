@@ -163,10 +163,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 				return true, nil
 			} else {
 				log.Logln(log.WARN, "[multipart2] ..")
-				sleep := (7 * time.Second) * MaxAuthTry
-				jitter := time.Duration(rand.Int63n(int64(sleep)))
-				sleep = sleep + jitter/2
-				time.Sleep(sleep)
+				longSleep()
 
 				c.AuthConfig.Clear = true
 				c.AuthAccount()
@@ -1275,7 +1272,7 @@ func (u *Upload) Process(c *Cloud) (string, error) {
 			}
 			return u.FileID, nil
 		} else {
-			return "", fmt.Errorf("upload failed, try again later %+v", err)
+			return "", fmt.Errorf("upload part(s) failed, try again later: %+v", err)
 		}
 
 	} else if !u.ValidateOverMinPartSize() {
