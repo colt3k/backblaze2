@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"math/rand"
 	"net/url"
 	"os"
 	"path"
@@ -14,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/colt3k/nglog/ers/bserr"
 	log "github.com/colt3k/nglog/ng"
@@ -106,50 +104,8 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 		p.Run()
 
 		// END WORKER POOL ****************************************************
-
-		if up.Completed() {
-			//Completed Finish off
-			shas := make([]string, 0)
-			for _, d := range up.Parts {
-				shas = append(shas, d.Etag)
-			}
-			_, err := c.FinishLargeFileUpload(up.FileID, shas)
-			if err != nil {
-				return false, err
-			}
-			return true, nil
-		} else {
-			// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
-			log.Logln(log.DEBUG, "[multipart1] ..")
-			sleep := (7 * time.Second) * MaxAuthTry
-			jitter := time.Duration(rand.Int63n(int64(sleep)))
-			sleep = sleep + jitter/2
-			time.Sleep(sleep)
-
-			c.AuthConfig.Clear = true
-			c.AuthAccount()
-
-			tasks = nil
-			// TRY AGAIN HERE!!!
-			for _, part := range up.Parts {
-				prt := part
-				if len(strings.TrimSpace(prt.Etag)) <= 0 {
-					//Create Task, send to worker
-					task := concur.NewTask(
-						func() (error, []byte) {
-							et := c.worker(up, prt, fo)
-							return nil, []byte(et)
-						},
-						NewRtnd(up))
-
-					tasks = append(tasks, task)
-				}
-			}
-			p := concur.NewPool(tasks, MaxPerSessionUploadPerPart)
-			p.Run()
-
-			// END WORKER POOL ****************************************************
-
+		counterCompleted := 0
+		for {
 			if up.Completed() {
 				//Completed Finish off
 				shas := make([]string, 0)
@@ -161,8 +117,12 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 					return false, err
 				}
 				return true, nil
-			} else {
-				log.Logln(log.WARN, "[multipart2] ..")
+
+			} else if counterCompleted < 10{	// try up to 10 times
+				counterCompleted += 1
+
+				// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
+				log.Logln(log.DEBUG, "[retry parts] ..")
 				longSleep()
 
 				c.AuthConfig.Clear = true
@@ -186,27 +146,15 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 				}
 				p := concur.NewPool(tasks, MaxPerSessionUploadPerPart)
 				p.Run()
-
-				// END WORKER POOL ****************************************************
-
-				if up.Completed() {
-					//Completed Finish off
-					shas := make([]string, 0)
-					for _, d := range up.Parts {
-						shas = append(shas, d.Etag)
-					}
-					_, err := c.FinishLargeFileUpload(up.FileID, shas)
-					if err != nil {
-						return false, err
-					}
-					return true, nil
-				}
+			} else {
+				return false, fmt.Errorf("issue upload all parts")
 			}
 		}
-		return false, fmt.Errorf("issue upload all parts")
 	}
 	return false, fmt.Errorf("authorization issue uploading multipart file")
 }
+
+
 
 func (c *Cloud) worker(up *Upload, p *UploaderPart, fo *os.File) string {
 
