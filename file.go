@@ -120,9 +120,10 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 
 			} else if counterCompleted < 10{	// try up to 10 times
 				counterCompleted += 1
-
+				AuthCounter += 1
 				// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
 				log.Logln(log.DEBUG, "[retry parts] ..")
+
 				longSleep()
 
 				c.AuthConfig.Clear = true
