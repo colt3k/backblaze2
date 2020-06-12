@@ -137,6 +137,9 @@ func testServiceUnavail(er errs.Error) bool {
 func shortSleep() {
 	jitter := rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(int64(3))
 	next := time.Duration(math.Pow(float64(2), float64(AuthCounter-1))) * time.Second
+	if next.Seconds() > 120 {
+		next = time.Duration(120) * time.Second
+	}
 	next = next + (time.Duration(jitter) * time.Second)
 	log.Logf(log.INFO, "retrying in %s", next)
 	time.Sleep(next)
@@ -144,6 +147,9 @@ func shortSleep() {
 func longSleep() {
 	jitter := rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(int64(7))
 	next := time.Duration(math.Pow(float64(2), float64(AuthCounter-1))) * time.Second
+	if next.Seconds() > 300 {
+		next = time.Duration(300) * time.Second
+	}
 	next = next + (time.Duration(jitter) * time.Second)
 	log.Logf(log.INFO, "retrying in %s", next)
 	time.Sleep(next)
