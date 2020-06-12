@@ -2,6 +2,7 @@ package backblaze2
 
 import (
 	"encoding/json"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -134,16 +135,16 @@ func testServiceUnavail(er errs.Error) bool {
 	return false
 }
 func shortSleep() {
-	sleep := (3 * time.Second) * time.Duration(AuthCounter)
-	jitter := time.Duration(rand.Int63n(int64(sleep)))
-	sleep = sleep + jitter/2
-	log.Logf(log.INFO, "retrying in %s", sleep)
-	time.Sleep(sleep)
+	jitter := rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(int64(3))
+	next := time.Duration(math.Pow(float64(2), float64(AuthCounter-1))) * time.Second
+	next = next + (time.Duration(jitter) * time.Second)
+	log.Logf(log.INFO, "retrying in %s", next)
+	time.Sleep(next)
 }
 func longSleep() {
-	sleep := (7 * time.Second) * time.Duration(AuthCounter)
-	jitter := time.Duration(rand.Int63n(int64(sleep)))
-	sleep = sleep + jitter/2
-	log.Logf(log.INFO, "retrying in %s", sleep)
-	time.Sleep(sleep)
+	jitter := rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(int64(7))
+	next := time.Duration(math.Pow(float64(2), float64(AuthCounter-1))) * time.Second
+	next = next + (time.Duration(jitter) * time.Second)
+	log.Logf(log.INFO, "retrying in %s", next)
+	time.Sleep(next)
 }
