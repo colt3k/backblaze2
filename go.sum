@@ -4,6 +4,8 @@ github.com/colt3k/nglog v0.0.2 h1:5eIFJ8rgy/HM4MbUTG1UdM3MdgvWAO+PSsDB2lKwwmQ=
 github.com/colt3k/nglog v0.0.2/go.mod h1:Gycec2LbK9zAVWb9XPSdD7j/obspuk0746SXq5AwzxA=
 github.com/colt3k/nglog v0.0.3 h1:Kg6JKCiRDZzWFdmTjOt33fnh+Eus5FI+wOqYXulolm4=
 github.com/colt3k/nglog v0.0.3/go.mod h1:Gycec2LbK9zAVWb9XPSdD7j/obspuk0746SXq5AwzxA=
+github.com/colt3k/nglog v0.0.11 h1:+CUg3KmuwlcSTlwibsHMmkOK2UFw/e+nKhEr7/kSTWM=
+github.com/colt3k/nglog v0.0.11/go.mod h1:WOpxEzrSEoQyuoWadXO1bTMiCGEM44LHdnGTHhSjtlo=
 github.com/colt3k/utils/concur v0.0.2 h1:ub3ayXX604nUrrZLJT0zusRLIXjpzba7rZgfyCb/yCI=
 github.com/colt3k/utils/concur v0.0.2/go.mod h1:9B+8HDVGSUpUejsp2M/w0NddC3cGvD5Id5G2cj9CTzA=
 github.com/colt3k/utils/crypt v0.0.1/go.mod h1:g6Wcw08sR4VqMkT6+3QGiX4fb+NKl9QvwsmiLnsLKOs=
@@ -31,6 +33,8 @@ github.com/colt3k/utils/mathut v0.0.1 h1:o/aIDspFY3PPdP1L1Xn/TSBp0V2m0o7X7MPxmCz
 github.com/colt3k/utils/mathut v0.0.1/go.mod h1:YK4vx6fJOhaIJ3idYVcILYl99CNpLol7mlG+K+PnJNw=
 github.com/colt3k/utils/netut v0.0.1 h1:KEgxUX5rY+v2gNaXBTnmeyO94VNo0ZSsSbjMojS2870=
 github.com/colt3k/utils/netut v0.0.1/go.mod h1:OTcQKaUjhExTGqzJJ6jg43uhGkAL+4JPDOpMiGQx6PU=
+github.com/colt3k/utils/netut v0.0.5 h1:HoR1a8hJzhrGjPs7c3Zv7zvUzyGg8i0JFTJQs7lNI8U=
+github.com/colt3k/utils/netut v0.0.5/go.mod h1:i714XPZ0erBxLBCb9m8F4n1syPfaPdhnHJAildN9xgg=
 github.com/colt3k/utils/osut v0.0.1 h1:6iNcG8jk8IjNnsxZuRS9vQeJLlihgx1cUmQnraPngV0=
 github.com/colt3k/utils/osut v0.0.1/go.mod h1:a9YuFtk23T9NNhGWzK4FFnGDnfghS34nt4fO0hBeCfc=
 github.com/colt3k/utils/store v0.0.1 h1:CfomZFxGdtPN3Q8eXf4G2DGGOd9PV/bgPYqoCZo9Uns=
@@ -39,6 +43,8 @@ github.com/colt3k/utils/stringut v0.0.1 h1:FvC45guBdUyXY5QcYo9lvVY7kweZoCtJD2TIy
 github.com/colt3k/utils/stringut v0.0.1/go.mod h1:LkfccKIxHAjHsyCNVb/LEENuMUJZ+2+qq8JWjl4qOFE=
 github.com/colt3k/utils/timeut v0.0.2 h1:RLUFqAKA92qfX9M7NAcVzJ6QISkaLQXZhNLr44kWsDE=
 github.com/colt3k/utils/timeut v0.0.2/go.mod h1:tsMdl07Vfflunv6s287uR1DNFzPv6rVLVKev3zWXXSI=
+github.com/go-mail/mail v2.3.1+incompatible h1:UzNOn0k5lpfVtO31cK3hn6I4VEVGhe3lX8AJBAxXExM=
+github.com/go-mail/mail v2.3.1+incompatible/go.mod h1:VPWjmmNyRsWXQZHVHT3g0YbIINUkSmuKOiLIDkWbL6M=
 github.com/gonutz/w32 v1.0.0 h1:3t1z6ZfkFvirjFYBx9pHeHBuKoN/VBVk9yHb/m2Ll/k=
 github.com/gonutz/w32 v1.0.0/go.mod h1:Rc/YP5K9gv0FW4p6X9qL3E7Y56lfMflEol1fLElfMW4=
 github.com/gorilla/context v1.1.1/go.mod h1:kBGZzfjB9CEq2AlWe17Uuf7NDRt0dE0s8S51q0aT7Yg=
@@ -56,6 +62,8 @@ github.com/mattn/go-isatty v0.0.4 h1:bnP0vzxcAdeI1zdubAl5PjU6zsERjGZb7raWodagDYs
 github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/mattn/go-isatty v0.0.9 h1:d5US/mDsogSGW37IV293h//ZFaeajb69h+EHFsv2xGg=
 github.com/mattn/go-isatty v0.0.9/go.mod h1:YNRxwqDuOph6SZLI9vUUz6OYw3QyUt7WiY2yME+cCiQ=
+github.com/mattn/go-isatty v0.0.12 h1:wuysRhFDzyxgEmMf5xjvJ2M9dZoWAXNNr5LSBS7uHXY=
+github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=
 github.com/mgutz/str v1.2.0 h1:4IzWSdIz9qPQWLfKZ0rJcV0jcUDpxvP4JVZ4GXQyvSw=
 github.com/mgutz/str v1.2.0/go.mod h1:w1v0ofgLaJdoD0HpQ3fycxKD1WtxpjSo151pK/31q6w=
 github.com/peterhellberg/duration v0.0.0-20180124233644-e84f2822e8a0 h1:MWioEoep2k2UHAo1s6jbOPKcoaEGFALMgQpnYpIToLA=
@@ -63,6 +71,8 @@ github.com/peterhellberg/duration v0.0.0-20180124233644-e84f2822e8a0/go.mod h1:x
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/rwcarlsen/goexif v0.0.0-20180518182100-8d986c03457a/go.mod h1:hPqNNc0+uJM6H+SuU8sEs5K5IQeKccPqeSjfgcKGgPk=
 golang.org/x/crypto v0.0.0-20180515001509-1a580b3eff78/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20181106171534-e4dc69e5b2fd/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
@@ -72,6 +82,8 @@ golang.org/x/crypto v0.0.0-20190103213133-ff983b9c42bc/go.mod h1:6SG95UA2DQfeDnf
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc h1:c0o/qxkaO2LF5t6fQrT4b5hzyggAkLLlCUjqfRxd8Q4=
 golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
+golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9 h1:vEg9joUBmeBcK9iSJftGNf3coIG4HqZElCPehJsfAYM=
+golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
 golang.org/x/sys v0.0.0-20181107165924-66b7b1311ac8/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190102155601-82a175fd1598/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
@@ -85,4 +97,10 @@ golang.org/x/sys v0.0.0-20191003212358-c178f38b412c h1:6Zx7DRlKXf79yfxuQ/7GqV3w2
 golang.org/x/sys v0.0.0-20191003212358-c178f38b412c/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191007154456-ef33b2fb2c41 h1:OC2BiV9nQHWgVMNbxZ5/eZKWnnd3Z4H9W5zdNvC4EBc=
 golang.org/x/sys v0.0.0-20191007154456-ef33b2fb2c41/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200116001909-b77594299b42/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1 h1:ogLJMz+qpzav7lGMh10LMvAkM/fAoGlaiiHYiFYdm80=
+golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc h1:2gGKlE2+asNV9m7xrywl36YYNnBG5ZQ0r/BOOxqPpmk=
+gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc/go.mod h1:m7x9LTH6d71AHyAX77c9yqWCCa3UKHcVEj9y7hAtKDk=
+gopkg.in/mail.v2 v2.3.1/go.mod h1:htwXN1Qh09vZJ1NVKxQqHPBaCBbzKhp5GzuJEA4VJWw=
