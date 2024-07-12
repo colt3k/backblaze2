@@ -1,9 +1,9 @@
 module github.com/colt3k/backblaze2
 
-go 1.17
+go 1.22
 
 require (
-	github.com/colt3k/nglog v0.0.27
+	github.com/colt3k/nglog v0.0.29
 	github.com/colt3k/utils/concur v0.0.2
 	github.com/colt3k/utils/encode v0.0.2
 	github.com/colt3k/utils/file v0.0.2
@@ -29,8 +29,8 @@ require (
 	github.com/mgutz/str v1.2.0 // indirect
 	github.com/peterhellberg/duration v0.0.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	golang.org/x/crypto v0.17.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
-	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/crypto v0.25.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/term v0.22.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 )
