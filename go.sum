@@ -13,6 +13,8 @@ github.com/colt3k/utils/file v0.0.13 h1:JxSxK1nIev1AOnA2Z5DFRIm4xwg5/w/tJUL3SQ+Q
 github.com/colt3k/utils/file v0.0.13/go.mod h1:DdyHPMHWAwPGBL9OvzO8aCl9u5aGx9uGATgMY2YzkMw=
 github.com/colt3k/utils/hash v0.0.9 h1:h+pE0P7JJKU4h6NjELVXcseIVa6oea+lZZBaYC6Rd9A=
 github.com/colt3k/utils/hash v0.0.9/go.mod h1:/F5/kGB++sDhjBL5klQ/yXal+UMDMKbMxZYRWwEqf1s=
+github.com/colt3k/utils/hash v0.0.10 h1:l89jKMce6rvT3O+0wMmXvLXexmQnNJT62rD12L1tWEg=
+github.com/colt3k/utils/hash v0.0.10/go.mod h1:xmpA7KYcPh8QmaDY1hII0s4pyOZTSD2HkBhqwSQSptw=
 github.com/colt3k/utils/io v0.0.22 h1:JmHK32Tz5wz6SBSBe6OB61WfTiH1P4WoWe9terrMnpc=
 github.com/colt3k/utils/io v0.0.22/go.mod h1:WGnsSp6MXqObW1tQnqIHkajjx7jgSGbWbx4AJFcwkOs=
 github.com/colt3k/utils/mathut v0.0.3 h1:CRji8GLhYz+tQEC5u/tpNwKPGcBv6k3V88ydJ8o8UDs=

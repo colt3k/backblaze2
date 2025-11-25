@@ -9,7 +9,7 @@ require (
 	github.com/colt3k/utils/concur v0.0.11
 	github.com/colt3k/utils/encode v0.0.8
 	github.com/colt3k/utils/file v0.0.13
-	github.com/colt3k/utils/hash v0.0.9
+	github.com/colt3k/utils/hash v0.0.10
 	github.com/colt3k/utils/io v0.0.22
 	github.com/colt3k/utils/mathut v0.0.3
 	github.com/colt3k/utils/netut v0.0.29
