@@ -42,6 +42,8 @@ import (
 
 const fileChunk = 10 * (1 << 20)
 const fileChunkLg = 100 * (1 << 20)
+
+// DownloadFileChunk is the byte range used for each multipart download request.
 const DownloadFileChunk = 10 * (1 << 20)
 const (
 	// MinPartSize in MB
@@ -55,7 +57,7 @@ const (
 )
 
 var (
-	//MaxPerSessionUploadPerPart sessions
+	// MaxPerSessionUploadPerPart caps concurrent multipart uploads in a single session.
 	MaxPerSessionUploadPerPart = 3
 )
 
@@ -118,7 +120,7 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 				}
 				return true, nil
 
-			} else if counterCompleted < 10{	// try up to 10 times
+			} else if counterCompleted < 10 { // try up to 10 times
 				counterCompleted += 1
 				AuthCounter += 1
 				// TRY TO RUN THROUGH INCOMPLETE ONES AGAIN after sleeping a bit
@@ -154,8 +156,6 @@ func (c *Cloud) SendParts(up *Upload) (bool, error) {
 	}
 	return false, fmt.Errorf("authorization issue uploading multipart file")
 }
-
-
 
 func (c *Cloud) worker(up *Upload, p *UploaderPart, fo *os.File) string {
 
@@ -274,7 +274,8 @@ func (c *Cloud) UploadURL(bucketId string) (*b2api.UploadURLResp, errs.Error) {
 }
 
 // UploadFile file name and info must fit in 7k byte limit,
-// 	the file to be uploaded is the message body and is not encoded in any way.
+//
+//	the file to be uploaded is the message body and is not encoded in any way.
 //		it's not URL encoded, it's not MIME encoded
 func (c *Cloud) UploadFile(bucketId string, up *Upload) (*b2api.UploadResp, errs.Error) {
 
@@ -699,8 +700,11 @@ func (c *Cloud) GetDownloadAuth(bucketID, filenamePrefix string, validDurationIn
 	return nil, errs.New(fmt.Errorf("not allowed"), "")
 }
 
-/* GetDownloadAuth required prior to download
+/*
+	GetDownloadAuth required prior to download
+
 In map:
+
 	body			- content of file
 	Content-Length
 	Content-Type
@@ -710,7 +714,9 @@ In map:
 	X-Bz-Info-author
 	X-Bz-Upload-Timestamp
 	Cache-Control : max-age (only); inherited from Bucket Info
+
 PLUS:
+
 	X-Bz-Info-* headers for any custom file info during upload
 */
 func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interface{}, errs.Error) {
@@ -745,8 +751,11 @@ func (c *Cloud) DownloadByName(bucketName, fileName string) (map[string]interfac
 	return nil, errs.New(fmt.Errorf("not allowed"), "")
 }
 
-/* DownloadByID downloads file by id
+/*
+	DownloadByID downloads file by id
+
 In map:
+
 	body			- content of file
 	Content-Length
 	Content-Type
@@ -756,7 +765,9 @@ In map:
 	X-Bz-Info-author
 	X-Bz-Upload-Timestamp
 	Cache-Control : max-age (only); inherited from Bucket Info
+
 PLUS:
+
 	X-Bz-Info-* headers for any custom file info during upload
 */
 func (c *Cloud) DownloadByID(fileID, byteRange string) (map[string]interface{}, errs.Error) {
@@ -1043,7 +1054,7 @@ type UploaderPart struct {
 	Etag   string `json:"etag"`
 }
 
-// Upload struct
+// Upload stores the local and remote state for a file upload, including multipart progress.
 type Upload struct {
 	AppName         string          `json:"-"`
 	Bucket          string          `json:"bucket"`
@@ -1058,7 +1069,7 @@ type Upload struct {
 	fcLg            bool
 }
 
-// New create upload object
+// NewUploader builds upload state from a local path and optional remote override path.
 func NewUploader(bucketName, filepath, overridepath string) *Upload {
 	t := new(Upload)
 	t.Bucket = bucketName
@@ -1069,7 +1080,7 @@ func NewUploader(bucketName, filepath, overridepath string) *Upload {
 	return t
 }
 
-// Available file exists
+// Available reports whether the configured local file can be read.
 func (u *Upload) Available() bool {
 	if len(strings.TrimSpace(u.Filepath)) <= 0 {
 		return false
@@ -1077,6 +1088,7 @@ func (u *Upload) Available() bool {
 	return u.File.Available()
 }
 
+// Load reads a persisted upload manifest from disk and restores its file handle metadata.
 func Load(filepath string) *Upload {
 	t := new(Upload)
 
@@ -1169,7 +1181,7 @@ func (u *Upload) SetupPartSizes(fileID string) {
 	}
 }
 
-// WriteOut write out upload info
+// WriteOutFileData2Upload persists multipart progress to the bucket-specific upload manifest.
 func (u *Upload) WriteOutFileData2Upload(app string) {
 
 	//Write out preparation of file for upload
@@ -1183,6 +1195,7 @@ func (u *Upload) WriteOutFileData2Upload(app string) {
 	}
 }
 
+// Process resolves the bucket and performs either a single upload or a multipart upload.
 func (u *Upload) Process(c *Cloud) (string, error) {
 	// Find bucketId by name
 	bkts, err := c.ListBuckets("", u.Bucket, nil)
@@ -1317,6 +1330,7 @@ func (r *Rtnd) Response(b []byte) {
 	r.upload.UpdateEtag(id, r.upload.AppName, r.etag)
 }
 
+// MultipartDownloadById downloads a file by ID and switches to ranged requests for large objects.
 func (c *Cloud) MultipartDownloadById(fileID, localFilePath, fileNameOverride string) (string, error) {
 	r, err := c.GetFileInfo(fileID)
 	if err != nil {

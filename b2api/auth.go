@@ -1,5 +1,6 @@
 package b2api
 
+// AuthConfig holds the credentials and cache settings used for account authorization.
 type AuthConfig struct {
 	AccountID     string
 	ApplicationID string

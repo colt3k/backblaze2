@@ -29,7 +29,7 @@ type ListUnfinishUpLgFilesReq struct {
 // B2ListUnfinishUpLgFilesResp struct
 type ListUnfinishUpLgFilesResp struct {
 	Files     []File `json:"files"`
-	NextField string  `json:"nextField"`
+	NextField string `json:"nextField"`
 }
 
 // Files struct
@@ -98,14 +98,16 @@ type UploadResp struct {
 	FileID          string   `json:"fileId"`
 	FileInfo        FileInfo `json:"fileInfo"`
 	FileName        string   `json:"fileName"`
-	UploadTimestamp int64    `json:"uploadTimestamp"`	// time in millis
+	UploadTimestamp int64    `json:"uploadTimestamp"` // time in millis
 }
 
+// FileInfo stores B2 custom file metadata used by this client for modification times and multipart hashes.
 type FileInfo struct {
 	SrcLastModifiedMillis string `json:"src_last_modified_millis"`
 	LargeFileSha1         string `json:"large_file_sha1,omitempty"`
 }
 
+// ListFileReq is the request payload for listing current file versions by prefix and start key.
 type ListFileReq struct {
 	BucketID      string       `json:"bucketId"`
 	StartFileName string       `json:"startFileName,omitempty"`
@@ -114,11 +116,13 @@ type ListFileReq struct {
 	Delimiter     string       `json:"delimiter,omitempty"`
 }
 
+// ListFilesResponse returns the current file view for a bucket plus the next page cursor.
 type ListFilesResponse struct {
 	File         []File `json:"files"`
-	NextFileName string  `json:"nextFileName"`
+	NextFileName string `json:"nextFileName"`
 }
 
+// ListFileVersionsReq requests all versions of files in a bucket, optionally scoped by prefix and cursor.
 type ListFileVersionsReq struct {
 	BucketID      string       `json:"bucketId"`
 	StartFileName string       `json:"startFileName,omitempty"`
@@ -128,10 +132,11 @@ type ListFileVersionsReq struct {
 	Delimiter     string       `json:"delimiter,omitempty"`
 }
 
+// ListFileVersionsResponse contains file versions and the cursors required for the next page.
 type ListFileVersionsResponse struct {
 	Files        []File `json:"files"`
-	NextFileName string  `json:"nextFileName"`
-	NextFileId   string  `json:"nextFileId"`
+	NextFileName string `json:"nextFileName"`
+	NextFileId   string `json:"nextFileId"`
 }
 
 type DeleteFileVersionReq struct {
@@ -221,11 +226,13 @@ type ListUnfinishedLargeFilesReq struct {
 	MaxFileCount MaxFileCount `json:"maxFileCount,omitempty"` // Optional
 }
 
+// ListUnfinishedLargeFilesResponse lists open multipart uploads that have not been finished or cancelled.
 type ListUnfinishedLargeFilesResponse struct {
 	Files      []UploadResp `json:"files"`
 	NextFileId string       `json:"nextFileId"`
 }
 
+// UploadPartResponse is returned after a single multipart upload part is accepted by B2.
 type UploadPartResponse struct {
 	ContentLength   int64  `json:"contentLength"`
 	ContentSha1     string `json:"contentSha1"`

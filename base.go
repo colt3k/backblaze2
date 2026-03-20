@@ -26,15 +26,20 @@ const (
 	AppFolderName = ".cloudstore"
 	// UploadFolder exported folder name
 	UploadFolder = "upload"
-	MaxAuthTry  = 1000
+	// MaxAuthTry bounds recursive auth refresh attempts on transient failures.
+	MaxAuthTry = 1000
 )
+
+// AuthCounter tracks the current retry depth for auth-sensitive operations.
 var AuthCounter = 0
 
+// Cloud is the root Backblaze B2 client used for all bucket, key, and file operations.
 type Cloud struct {
 	AuthConfig   b2api.AuthConfig
 	AuthResponse *b2api.AuthorizationResp
 }
 
+// CloudStore creates a client, loads or refreshes authorization, and returns the ready-to-use handle.
 func CloudStore(accountId, appId, appName string) *Cloud {
 	t := new(Cloud)
 	t.AuthConfig = b2api.AuthConfig{AccountID: accountId, ApplicationID: appId, Clear: false, AppName: appName}
@@ -42,6 +47,7 @@ func CloudStore(accountId, appId, appName string) *Cloud {
 	return t
 }
 
+// AuthAccount refreshes the cached auth token when needed and stores the latest response locally.
 func (c *Cloud) AuthAccount() {
 	// if it exists and is less than 24hrs old use it first, otherwise renew it
 	token := env.Token(c.AuthConfig.AppName, c.AuthConfig.Clear)
@@ -75,7 +81,7 @@ func (c *Cloud) AuthAccount() {
 				if AuthCounter > 1 {
 					shortSleep()
 				}
-				if testServiceUnavail(ers){
+				if testServiceUnavail(ers) {
 					longSleep()
 				}
 				c.AuthConfig.Clear = true
@@ -100,7 +106,7 @@ func (c *Cloud) AuthAccount() {
 	AuthCounter = 0
 }
 
-// UploaderDir build uploader directory
+// UploaderDir returns the persisted multipart-upload manifest path for a bucket.
 func UploaderDir(bucketName string) string {
 	home := file.HomeFolder()
 	appPath := filepath.Join(home, AppFolderName)
@@ -113,17 +119,17 @@ func UploaderDir(bucketName string) string {
 func testRetryErr(er errs.Error) bool {
 
 	if er.Code() == "bad_auth_token" || er.Code() == "expired_auth_token" || er.Code() == "service_unavailable" ||
-		er.Code() == "misc_error" || (er.Status() >= 500 && er.Status() < 600){
+		er.Code() == "misc_error" || (er.Status() >= 500 && er.Status() < 600) {
 		if er.Code() == "bad_auth_token" || er.Code() == "misc_error" {
-			log.Logf(log.INFO,"%d %s: retrying", er.Status(), er.Code())
+			log.Logf(log.INFO, "%d %s: retrying", er.Status(), er.Code())
 		}
 		if er.Status() < 500 && er.Status() > 600 {
-			log.Logf(log.WARN,"%s", string(debug.Stack()))
+			log.Logf(log.WARN, "%s", string(debug.Stack()))
 		}
 		return true
 	} else {
 		if er.Code() != "not_found" {
-			log.Logf(log.WARN,"Missed Issue? %+v\n%s", er, string(debug.Stack()))
+			log.Logf(log.WARN, "Missed Issue? %+v\n%s", er, string(debug.Stack()))
 		}
 	}
 	return false
